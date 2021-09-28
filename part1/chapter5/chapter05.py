@@ -215,6 +215,7 @@ sns.heatmap(df_norm.corr()[['Pres_DEM','Pres_REP']],annot = True)
 
 sns.jointplot(x='White',y='Pres_REP', data= df_norm, alpha = 0.2)
 
+
 sns.jointplot(x='White',y='Pres_REP', data= df_norm, kind = 'hex') #white가 많은 지역이라고 꼭 rep 지지율이 압도적으로 높은건 아님
 
 sns.jointplot(x='White',y='Pres_REP', hue = 'Professional', data= df_norm, alpha = 0.2) #일단 white가 많으면 rep지지율이 높긴하지만 
@@ -229,6 +230,7 @@ sns.jointplot(x='Black', y ='Pres_DEM', data=df_norm, alpha = 0.2) #black 인구
 ### 문제 9. Plotly의 Choropleth 데이터 포맷으로 맞추기
 """
 
+#각 카운티당 정당별 지지율을 지도에서 표현해본다
 import plotly.figure_factory as ff
 
 # FIPS 코드 불러오기
@@ -240,33 +242,74 @@ df_sample['FIPS'] = df_sample['State FIPS Code'] + df_sample['County FIPS Code']
 # Color Scale 세팅
 colorscale = ["#f7fbff","#ebf3fb","#deebf7","#d2e3f3","#c6dbef","#b3d2e9","#9ecae1",
               "#85bcdb","#6baed6","#57a0ce","#4292c6","#3082be","#2171b5","#1361a9",
-              "#08519c","#0b4083","#08306b"]
+              "#08519c","#0b4083","#08306b"] #bin수에 맞춰서 색을 나눠줌
 
 # ff.create_choropleth()에서 사용할 수 있도록 데이터프레임 정리하기
 # Hint) 공식 레퍼런스 참조: https://plotly.com/python/county-choropleth/#the-entire-usa
 
+df_sample
+#state abbreviation을 맞춰야 쓸수있기때문에 위에서 했던걸 약어로 바꿔줌
+
+state_code.head()
+
+#주 이름을 우편코드로 바꾸기
+
+state_map = state_code.set_index('State/District')['Postal Code'] #우편코드만 가져옴
+
+df_norm.head() #state를 약어로 바꾸고 싶다
+
+df_norm.reset_index() #state가 일반컬럼으로 바뀜
+
+counties = df_norm.reset_index()['county'] + ', ' + df_norm.reset_index()['state'].map(state_map)
+#각 county 를 county '이름, 주 우편코드' 형식으로 바꿈
+
+counties_to_fips = df_sample.set_index('County Name/State Abbreviation')['FIPS']
+counties_to_fips
+#county이름/주 우편코드를 해당 fips로 변환할수 있게해줌
+
+fips = counties.map(counties_to_fips)
+fips #df_norm의 county list를 모두 fips로 만들어 choropleth에서 쓸 수 있게 해줌
+
+data = df_norm.reset_index()['Pres_DEM'][fips.notna()] #민주당쪽 투표한 비율을 기준으로 데이터셋을 만들고, fips가 없는 데이터는 버린다
+fips = fips[fips.notna()] #fips에서도 fips가 없는 데이터는 버린다
+# 각 county별 민주당 지지율을 fips끼리 일치시켜 지도에 표현한다
+
 """### 문제 10. Choropleth map 시각화하기"""
+
+!pip install plotly-geo
+!pip install plotly
+
+!conda install -c plotly plotly-geo
 
 # ff.create_choropleth() 메소드를 이용하여 Choropleth 플랏하기
 # Hint) 공식 레퍼런스 참조: https://plotly.com/python/county-choropleth/#the-entire-usa
 
-fig = ff.create_choropleth(...)
-
-
+fig = ff.create_choropleth(
+    fips=fips, values=data,
+    show_state_data=False,
+    colorscale=colorscale,
+    binning_endpoints=list(np.linspace(0.0, 1.0, len(colorscale) - 2)),
+    show_hover=True, centroid_marker={'opacity': 0},
+    asp=2.9, title='USA by Voting for DEM Presient'
+)
 
 fig.layout.template = None
 fig.show()
+
+np.linspace(0,1,21) #앞,뒤 사이를 마지막 숫자 간격으로 나눠줌
 
 """## Step 4. 모델 학습을 위한 데이터 전처리
 
 ### 문제 11. 학습을 위한 데이터프레임 구성하기
 """
 
+df_norm.columns
+
 # 투표 결과에 해당하는 데이터는 입력 데이터에서 제거한다.
 # 예측 타겟은 DEM vs. REP 투표 비율로 한다.
 
-X =
-y =
+X = df_norm.drop(['Pres_DEM', 'Pres_REP', 'Gov_DEM', 'Gov_REP'],axis = 1)
+y = df_norm['Pres_DEM']
 
 """### 문제 12. StandardScaler를 이용해 수치형 데이터 표준화하기
 
@@ -275,8 +318,10 @@ y =
 from sklearn.preprocessing import StandardScaler
 
 # StandardScaler를 이용해 수치형 데이터를 표준화하기
-scaler =
-X =
+scaler = StandardScaler()
+scaler.fit(X)
+X_scaled = scaler.transform(X)
+X = pd.DataFrame(data=X_scaled, index=X.index, columns=X.columns)
 
 """### 문제 13. 학습데이터와 테스트데이터 분리하기
 
@@ -285,14 +330,20 @@ X =
 from sklearn.model_selection import train_test_split
 
 # train_test_split() 함수로 학습 데이터와 테스트 데이터 분리하기
-X_train, X_test, y_train, y_test =
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1)
 
 """### 문제 14. PCA를 이용해 데이터 전처리 수행하기"""
 
 from sklearn.decomposition import PCA
 
 # PCA를 이용해 Dimensionality Reduction 수행하기
-pca =
+pca = PCA()
+pca.fit(X_train)
+plt.plot(range(1, len(pca.explained_variance_) + 1), pca.explained_variance_)
+plt.grid()
+
+pca = PCA(n_components=5)
+pca.fit(X_train)
 
 """## Step 4. Regression 모델 학습하기
 
@@ -302,7 +353,8 @@ pca =
 from lightgbm import LGBMRegressor
 
 # XGBRegressor 모델 생성/학습. Feature에 PCA 적용하기
-model_reg =
+model_reg = LGBMRegressor()
+model_reg.fit(X_train, y_train)
 
 """### 문제 16. Regression 모델 정확도 출력하기"""
 
@@ -311,7 +363,10 @@ from sklearn.metrics import classification_report
 from math import sqrt
 
 # Predict를 수행하고 mean_absolute_error, mean_squared_error, classification_report 결과 출력하기
-pred =
+pred = model_reg.predict(X_test)
+print(mean_absolute_error(y_test, pred))
+print(sqrt(mean_squared_error(y_test, pred)))
+print(classification_report(y_test > 0.5, pred > 0.5)) #pca로 변수를 줄였는데도 높은 정확률. pca 10일때 0.92, pca 안하면 0,95
 
 """## Step 5. Classification 모델 학습하기
 
@@ -321,15 +376,21 @@ pred =
 from xgboost import XGBClassifier
 
 # XGBClassifier 모델 생성/학습
-model_cls =
+model_cls = XGBClassifier()
+model_cls.fit(X_train, y_train > 0.5) #y_train이 실수값이라 범위를 지정해 줘야함
 
 """### 문제 18. Classifier의 Feature Importance 시각화하기
 
 """
 
 # XGBClassifier 모델의 feature_importances_ 속성 시각화
+plt.bar(X.columns, model_cls.feature_importances_)
+plt.xticks(rotation=90)
+plt.show()
 
 """### 문제 19. Classifier 모델 정확도 출력하기"""
 
 # Predict를 수행하고 classification_report() 결과 출력하기
-pred =
+plt.bar(X.columns, model_cls.feature_importances_)
+plt.xticks(rotation=90)
+plt.show()
