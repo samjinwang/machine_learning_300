@@ -114,15 +114,95 @@ df = pd.read_csv('vehicles.csv')
 # DataFrame에서 제공하는 메소드를 이용하여 각 데이터프레임의 구조 분석하기 (head(), info(), describe())
 # 데이터프레임에서 불필요한 컬럼 제거하기
 
+df.head()
+#year을 age로환산해서 만든다
+#범주형 데이터 cylinder fuel 은 누락된 데이터가 있을 확률이 높아보임
+#odometer은 정확히 적혀잇는 정도가 다 다를것같아보임
+#VIN 은 별로 안중요해보임
+
+df.info() #
+
+
+
+df.isna().sum() #null이 빠져있는 값들이 많아보인다
+#condition은 중요한정보인데 많이 빠져있다
+#주요한 요소들로 예상되는데 비어있는 값들이 많다
+
+df.describe()
+
+df.columns
+
+df.drop([ 'id', 'url', 'region_url', 'VIN',
+         'image_url', 'description', 'state', 'lat', 
+         'long', 'posting_date'], axis=1, inplace=True) #머신러닝에 분석이 어렵거나 비어있는 값이 많은 경우는 빼버림
+
+df['age'] = 2021 - df['year']
+df.drop('year', axis=1, inplace=True) #year를 age(차의 나이)로 바꾼다 _> 분석에 더 적합
+
+df.columns
+
+
+
 """### 문제 5. 범주형 데이터의 통계 분석하기
 
 """
 
+df.columns
+
 # 범주형 데이터의 값의 범위, 기초 통계 분석하기
+
+
+len(df['manufacturer'].value_counts()) #총 43개의 종류
+df['manufacturer'].value_counts()
+
+fig = plt.figure(figsize=(8, 10))
+#팔린 차의 제조사 별로 팔린횟수 기준으로 내림차순한다
+sns.countplot(y='manufacturer', data=df.fillna('n/a'), order=df.fillna('n/a')['manufacturer'].value_counts().index)
+
+#모든 차의 모델을 다 출력해본다 ->굉장히 많음
+for model, num in zip(df['model'].value_counts().index, df['model'].value_counts()):
+  print(model, num)
+
+  # num 이 1인 값 즉 한번밖에 안된값은 제대로 스크랩된 데이터가 대부분 아니다
+
+# new 도 na에 포함할지 생각해 봐야함
+sns.countplot(y='condition', data=df.fillna('n/a'), order=df.fillna('n/a')['condition'].value_counts().index)
+
+# 
+sns.countplot(y='cylinders', data=df.fillna('n/a'), order=df.fillna('n/a')['cylinders'].value_counts().index)
+
+#웬만하면 gas 차 휘발유
+sns.countplot(y='fuel', data=df.fillna('n/a'), order=df.fillna('n/a')['fuel'].value_counts().index)
+
+# 자동기어인 애들이 주로다
+
+sns.countplot(y='transmission', data=df.fillna('n/a'), order=df.fillna('n/a')['transmission'].value_counts().index)
+
+#4개가 다 비슷해서 그대로 써도 무난할듯
+sns.countplot(y='drive', data=df.fillna('n/a'), order=df.fillna('n/a')['drive'].value_counts().index)
+
+sns.countplot(y='size', data=df.fillna('n/a'), order=df.fillna('n/a')['size'].value_counts().index)
+
+sns.countplot(y='type', data=df.fillna('n/a'), order=df.fillna('n/a')['type'].value_counts().index)
+
+sns.countplot(y='paint_color', data=df.fillna('n/a'), order=df.fillna('n/a')['paint_color'].value_counts().index)
 
 """### 문제 6. 수치형 데이터의 통계 분석하기"""
 
 # 수치형 데이터의 값의 범위, 기초 통계 분석하기
+# 수치형 데이터의 값의 범위, 기초 통계 분석하기
+fig = plt.figure(figsize=(8, 2))
+#box플랏으로 봣을때 좋은 결과가 안나옴
+#
+sns.rugplot(x='price', data=df, height=1)
+
+fig = plt.figure(figsize=(8, 2))
+#outlier가 많아서 rugplot으로 해본다
+sns.rugplot(x='odometer', data=df, height=1)
+
+sns.histplot(x='age', data=df, bins=18, kde=True) #이건 무난하게 시각화가 됨
+
+
 
 """## Step 3. 데이터 클리닝 수행하기
 
@@ -209,3 +289,4 @@ pred =
 
 # err의 히스토그램으로 에러율 히스토그램 확인하기
 err = (pred - y_test) / y_test
+
