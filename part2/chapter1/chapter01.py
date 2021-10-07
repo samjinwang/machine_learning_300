@@ -133,7 +133,7 @@ df.describe()
 df.columns
 
 df.drop([ 'id', 'url', 'region_url', 'VIN',
-         'image_url', 'description', 'state', 'lat', 
+         'image_url', 'description', 'state', 'lat','county' 
          'long', 'posting_date'], axis=1, inplace=True) #머신러닝에 분석이 어렵거나 비어있는 값이 많은 경우는 빼버림
 
 df['age'] = 2021 - df['year']
@@ -191,9 +191,9 @@ sns.countplot(y='paint_color', data=df.fillna('n/a'), order=df.fillna('n/a')['pa
 
 # 수치형 데이터의 값의 범위, 기초 통계 분석하기
 # 수치형 데이터의 값의 범위, 기초 통계 분석하기
-fig = plt.figure(figsize=(8, 2))
 #box플랏으로 봣을때 좋은 결과가 안나옴
 #
+fig = plt.figure(figsize=(8, 2))
 sns.rugplot(x='price', data=df, height=1)
 
 fig = plt.figure(figsize=(8, 2))
@@ -210,26 +210,173 @@ sns.histplot(x='age', data=df, bins=18, kde=True) #이건 무난하게 시각화
 """
 
 # Boxplot 계열로 범주형 데이터를 시각화하여 분석하기
+df.columns
+
+sns.boxplot(x='manufacturer', y = 'price', data=df.fillna('n/a')) #알아보기 힘듬
+
+sns.boxplot(x='fuel', y = 'price', data=df.fillna('n/a')) #아웃라이어가 너무 많음
 
 """### 문제 8. 범주형 데이터 클리닝하기"""
 
 # 범주형 데이터를 아래 방법 중 적절히 판단하여 처리하기
+df.columns
+
 # 1. 결손 데이터가 포함된 Row를 제거
+df['manufacturer'].fillna('others').value_counts() # 전체 기준을 제조사로 함
+
+col = 'manufacturer'
+counts = df[col].fillna('others').value_counts() #결손값을 기타로 채운후 '제조사' 컬럼의 요소들 갯수를 파악
+plt.plot(range(len(counts)),counts) #차가 많이 팔린 제조사로 내림 차운으로 선그래프가 나타남 (x축은 많이팔린 순위),(y축은 팔린 댓수)
+
+n_categorical = 10
+counts.index[n_categorical:] #많이 팔린 상위 n개 그룹을 제외한 나머지
+df[col] = df[col].apply(lambda s : s if str(s) not in counts.index[n_categorical:] else 'others')
+
+df[col].value_counts()
+
+#같은 방식
+col = 'region'
+counts = df[col].fillna('others').value_counts()
+plt.plot(range(len(counts)),counts) #5부터 급격한 감소
+
+n_categorical = 5
+df[col] = df[col].apply(lambda s : s if str(s) not in counts.index[n_categorical:] else 'others')
+
+df[col].value_counts()
+
+col = 'model'
+counts = df[col].fillna('others').value_counts()
+plt.plot(range(len(counts[:20])),counts[:20]) #상위 10개만 해도 될듯
+
+n_categorical = 10
+others =  counts.index[n_categorical:]
+df[col] = df[col].apply(lambda s : s if str(s) not in others else 'others') #30000개를 일일이 처리하려면 힘드니 others를 따로 만들어서 한다
+
+df[col].value_counts()
+
+col = 'condition'
+counts = df[col].fillna('others').value_counts()
+plt.plot(range(len(counts)),counts) #5부터 급격한 감소
+
+n_categorical = 3
+others =  counts.index[n_categorical:]
+df[col] = df[col].apply(lambda s : s if str(s) not in others else 'others')
+
+col = 'cylinders'
+counts = df[col].fillna('others').value_counts()
+plt.plot(range(len(counts)),counts)
+n_categorical = 4
+others =  counts.index[n_categorical:]
+df[col] = df[col].apply(lambda s : s if str(s) not in others else 'others')
+
+col = 'fuel'
+counts = df[col].fillna('others').value_counts()
+plt.plot(range(len(counts)),counts)
+n_categorical = 2
+others =  counts.index[n_categorical:]
+df[col] = df[col].apply(lambda s : s if str(s) not in others else 'others')
+
+# col = 'title_status'
+# counts = df[col].fillna('others').value_counts()
+# plt.plot(range(len(counts)),counts)
+# n_categorical = 2
+# others =  counts.index[n_categorical:]
+df.drop('title_status',axis = 1, inplace = True)
+
+col = 'transmission'
+counts = df[col].fillna('others').value_counts()
+plt.plot(range(len(counts)),counts)
+
+n_categorical = 2
+others =  counts.index[n_categorical:]
+df[col] = df[col].apply(lambda s : s if str(s) not in others else 'others')
+
+col = 'drive'
+counts = df[col].fillna('others').value_counts()
+plt.plot(range(len(counts)),counts)
+#수정할 필요 없어보임
+df[col].fillna('others').value_counts() #그래도 결측값은 확실히 추가해 놓는다
+
+col = 'size'
+counts = df[col].fillna('others').value_counts()
+plt.plot(range(len(counts)),counts)
+
+n_categorical = 2
+others =  counts.index[n_categorical:]
+df[col] = df[col].apply(lambda s : s if str(s) not in others else 'others')
+
+col = 'type'
+counts = df[col].fillna('others').value_counts()
+plt.plot(range(len(counts)),counts)
+n_categorical = 8
+others =  counts.index[n_categorical:]
+
+df[col] = df[col].apply(lambda s : s if str(s) not in others else 'others')
+
+df.loc[df[col]=='other',col] = 'others'
+df[col].value_counts() #other과 others를 합쳐준다
+
+col = 'paint_color'
+counts = df[col].fillna('others').value_counts()
+plt.plot(range(len(counts)),counts)
+n_categorical = 7
+others =  counts.index[n_categorical:]
+df[col] = df[col].apply(lambda s : s if str(s) not in others else 'others')
+
 # 2. 결손 데이터를 others 범주로 변경하기
+
 # 3. 지나치게 소수로 이루어진 범주를 others 범주로 변경하기
+
+#(4. Classifier를 학습해서 결손 데이터 추정하여 채워넣기)
 
 """### 문제 9. 수치형 데이터 시각화하여 분석하기"""
 
 # Seaborn을 이용하여 범주형 데이터를 시각화하여 분석하기
 # Hint) 값의 범위가 너무 넓을 경우 histplot() 등이 잘 동작하지 않으므로, rugplot을 활용
+fig = plt.figure(figsize=(8, 2))
+sns.rugplot(x='price', data=df, height=1)
+
+fig = plt.figure(figsize=(8, 2))
+sns.rugplot(x='odometer', data=df, height=1)
+
+fig = plt.figure(figsize=(8, 2))
+sns.histplot(x='age', data=df, bins = 18,kde = True)
 
 """### 문제 10. 수치형 데이터 클리닝하기"""
 
 # quantile() 메소드를 이용하여 outlier 제거하고 시각화하여 확인하기
 
+p1 = df['price'].quantile(0.99) #상위  1퍼센트 수치값 66995
+ 
+p2 = df['price'].quantile(0.1) #하위 10퍼센트 500
+p1,p2
+
+df = df[(p1 >df['price']) &(p2 <df['price'])]
+
+o1 = df['odometer'].quantile(0.99) #상위  1퍼센트 수치값 280000
+ 
+o2 = df['odometer'].quantile(0.1) #하위 10퍼센트 14939
+
+o1,o2
+
+df = df[(o1 >df['odometer']) &(o2 <df['odometer'])]
+
+df.describe()
+
+plt.figure(figsize = (10,5))
+sns.boxplot(x='manufacturer', y = 'price', data=df) #더 잘보임
+# 값의 범위가 비슷함 (아웃라이어 포함) -> 얼마나 유용할지는 두고봐야할듯
+# 그래도 상/하위 25프로(박스자체)만 볼때는 유용해 보이기도 함 통계적으로는
+
+plt.figure(figsize = (10,5))
+sns.boxplot(x='model', y = 'price', data=df) #제조사보다 좀더 다이내믹함
+#비싼보델일수록 확실히 높은 구간에 있음
+
 """### 문제 11. 컬럼간의 Correlation Heatmap으로 시각화하기"""
 
-
+sns.heatmap(df.corr(), annot = True, cmap= 'YlOrRd') 
+#odometer 와 차의 나이가 값에 악영향을 줌을 알 수 있다 
+#odometer 와 age가 상관관계가 있어보임 -> 둘의 콜라보는 좋지 않을지 몰라도 좋은 feature로서의 역할은 하긴할듯
 
 """## Step 4. 모델 학습을 위한 데이터 전처리
 
@@ -239,14 +386,28 @@ sns.histplot(x='age', data=df, bins=18, kde=True) #이건 무난하게 시각화
 from sklearn.preprocessing import StandardScaler
 
 # StandardScaler를 이용해 수치형 데이터를 표준화하기
-X_num =
+X_num = df[['odometer','age']]
+scalar = StandardScaler()
+scalar.fit(X_num)
+X_scaled = scalar.transform(X_num)
+X_scaled = pd.DataFrame(X_scaled, index = X_num.index, columns=X_num.columns)
+
 
 # get_dummies를 이용해 범주형 데이터를 one-hot 벡터로 변경하기
-X_cat =
+X_cat = df.drop(['price','odometer','age'],axis = 1)
+X_cat = pd.get_dummies(X_cat) #linear regression은 안하므로 drop first는 안한다
 
 # 입출력 데이터 통합하기
-X = 
-y =
+X = pd.concat([X_scaled, X_cat],axis =1 )
+y = df['price']
+
+X.head()
+
+X.shape
+
+X.isna().sum()
+#age가 결측값이 있음
+X.fillna(0.0,inplace=True) #age가 이미 표준화된 값이라 굳이 평균값을 안집어넣어도됨
 
 """### 문제 13. 학습데이터와 테스트데이터 분리하기
 
@@ -255,7 +416,7 @@ y =
 from sklearn.model_selection import train_test_split
 
 # train_test_split() 함수로 학습 데이터와 테스트 데이터 분리하기
-X_train, X_test, y_train, y_test =
+X_train, X_test, y_train, y_test = train_test_split(X,y,test_size=0.3,random_state = 1)
 
 """## Step 5. Regression 모델 학습하기
 
@@ -265,7 +426,8 @@ X_train, X_test, y_train, y_test =
 from xgboost import XGBRegressor
 
 # XGBRegressor 모델 생성/학습
-model_reg =
+model_reg = XGBRegressor()
+model_reg.fit(X_train, y_train)
 
 """### 문제 15. 모델 학습 결과 평가하기"""
 
@@ -273,7 +435,10 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from math import sqrt
 
 # Predict를 수행하고 mean_absolute_error, rmse 결과 출력하기
-pred =
+pred = model_reg.predict(X_test)
+print(mean_absolute_error(y_test,pred)) 
+print(sqrt(mean_squared_error(y_test,pred))) #에러값 제곱하고 평균을 낸후 루트를 씌움 (rmse)
+#에러값들이 상당히 크다
 
 """## Step 6. 모델 학습 결과 심화 분석하기
 
@@ -283,10 +448,46 @@ pred =
 # y_test vs. pred Scatter 플랏으로 시각적으로 분석하기
 # Hint) Scatter로 시각적 확인이 어려울 경우, histplot 등 활용
 
+plt.scatter(x=y_test,y=pred,alpha = 0.005) #alpha를 조절해서 겹치는게 적은 부분을 옅게표현
+plt.plot([0,60000],[0,60000],'r-')
+
+#값이 낮은 차들은 y = x축에 잘 형성된걸보니 잘 분석이 되었다
+#근데 실제로 아주 값이 작은 차는 학습모델에선 매우 비싸게 예측됨
+#그리고 차가 비쌀때 (4만불이상)은 실제보다 가격이 낮다고 측정됨
+
+sns.histplot(x=y_test,y=pred)
+plt.plot([0,60000],[0,60000],'r-')
+
 """### 문제 17. 에러 값의 히스토그램 확인하기
 
 """
 
 # err의 히스토그램으로 에러율 히스토그램 확인하기
-err = (pred - y_test) / y_test
+err = (pred - y_test) / y_test *100
+sns.histplot(err[err<600]) #에러율이 6보다 작은애들
+plt.xlabel('error(%)')
+plt.xlim(-100,100)
+plt.grid()
 
+#값이 0보다 약간 왼쪽으로 치우져져있다 -> underestimated 되어있다
+#예상 보다 낮게 측정될때는 -100%까지 가진 않는다
+#예상 보다 높게 측정될때는 +100%를 웃도는 경우도 있다 -> 에러율이 아주높은 애들이 있다
+
+plt.show()
+
+#에러율 0근처에 값이 몰려있을수록 잘학습된 모델이다
+#안좋을수록 좌우로 퍼짐
+
+err = (pred - y_test)
+sns.histplot(err) #에러율이 6보다 작은애들
+plt.xlabel('error($)')
+
+plt.grid()
+
+#에러값 자체로만 봤을 땐 0기준으로 정돈되어 나타나 있다
+
+#성능개선 아이디어
+# 범주형 데이터 클리닝시 
+# model의 경우 이름이 다양하니까 대문자,소문자 둘중하나로 다 맞춘후 other로 빠지는 값을 최대한 줄여본다
+# 또는 model명을 표준화해서 조금씩 다르게 표현된 모델명을 하나로 맞춰주는 작업을 해줘도 좋을듯
+# 가격을 표준화를 많이 시켜서 저가,고가로 나누는게 아니라 좀더 잘 나눴으면 좋앗을지도
