@@ -177,14 +177,66 @@ sns.boxplot(x = 'room_type', y = 'price', data = df) #마찬가지
 
 # 각 컬럼을 분석하여 미기입/오기입된 데이터 확인하기
 # Hint) 수치형 데이터는 통계를 이용해서, 범주형 데이터는 unique(), value_counts()등으로 확인
+df.columns
+
+df.isna().sum() #미기입 데이터 확인
+
+df['neighbourhood_group'].value_counts() #5개의 클래스
+
+neigh = df['neighbourhood'].value_counts()
+plt.plot(range(len(neigh)),neigh)  #50개 기준으로 끊어주면 좋을 것 같다
+
+df['neighbourhood'] = df['neighbourhood'].apply(lambda s:s if str(s) not in neigh[50:] else 'others') #50개기준으로 기타와 네이버로 나눠줌
+
+df['neighbourhood'].value_counts() #50개이상인 범주만 남게되었다 -> 많은편이긴하지만 갯수가 많은 범주형데이터가 이것뿐이고 중요한 요소라 판단되어 가져간다
+
+df['room_type'].value_counts() #종류가 별로 없어서 일단 놔둔다
+
+############수치형#################
+sns.rugplot(x = 'price',data = df, height = 1) #2000에 많이 몰려있지만, 6000 이상에도 꽤 값들이 있다
+
+df['price'].quantile(0.95) # 상위 1프로 값이 355불임 -> 사실상 800이상인 값들은 러그플랏에서 보이는거와 달리 극소수 갯수일뿐임
+df['price'].quantile(0.005) # 하위 0.5프로 값 26불 -> 잘라준다 -> 통계를 통해 본 min 값이 0인것도 있어서 제거해줘야함 (숙박비가 0원인게 말이안됨)
+
+sns.rugplot(x = 'minimum_nights',data = df, height = 1)
+
+df['minimum_nights'].quantile(0.98) # 상위 5프로, 상위 2프로 다 30일 -> 상위 2프로 날려버린다
+df['minimum_nights'].quantile(0.005) # 하위 0.5프로 1일 -> 어차피 min값이 1이니까 하위값은 자를필요 없어보임
+
+sns.rugplot(x = 'availability_365',data = df, height = 1)
+
+df['availability_365'].quantile(0.98) #365일 -> 365일 다되는 집이 많은편이라 안잘라도 될듯
+df['availability_365'].quantile(0.30) #상위 30프로까지도 0일임 -> 그냥 그대로 0으로 두고 이게 0인지 아닌지를 표기하는 추가적인 범주형 데이터를 만들면 좋을것같다
 
 """### 문제 9. 아웃라이어를 제거하고 통계 재분석하기"""
 
 # quantile(), drop() 등 메소드를 이용하여 outlier 제거하고 통계 재분석하기
+p1 = df['price'].quantile(0.95)
+p2 = df['price'].quantile(0.005)
+print(p1,p2)
+
+df = df[(df['price']<p1)&(df['price']>p2)]
+
+df['price'].hist() #완전 가우시안 형태는 아니지만 그래도 나름 용이하게 쓸수있는 모양
+
+m1 = df['minimum_nights'].quantile(0.95)
+print(m1) #위에 price에서 제거되는과정에서 변경됏을수도 있으니 확인해본다
+df = df[df['minimum_nights']<m1]
+df['minimum_nights'].hist() #값이 큰것들을 날려준것이 확인됨
+
+df['is_avail_zero'] = df['availability_365'].apply(lambda x: 'Zero' if x ==0 else 'Nonzero') #카테고리컬 데이터 생성
+
+
 
 """### 문제 10. 미기입 데이터 처리하기"""
 
 # fill(), dropna() 등으로 미기입된 데이터를 처리하기
+df['review_exists'] = df['reviews_per_month'].isna().apply(lambda x : 'New' if x is True else 'Old')
+# 값이 있으면(달별 리뷰가 있으면) True -> 'New' 호스트로 명명해줌 반대는 'Old'
+
+df.fillna(0,inplace = True) #review_per_month에 여전히 결측값이 존재 -> 리뷰 0건으로 세팅
+
+df.isna().sum()
 
 """## Step 4. 모델 학습을 위한 데이터 전처리
 
