@@ -78,7 +78,7 @@ import os
 # os.environ을 이용하여 Kaggle API Username, Key 세팅하기
 # os.environ을 이용하여 Kaggle API Username, Key 세팅하기
 os.environ['KAGGLE_USERNAME'] = 'samjinwang'
-os.environ['KAGGLE_KEY'] = 'e808743bea20e4a89b105256b9d5941b'
+os.environ['KAGGLE_KEY'] = '50f59f3ee7398d8b54738b567b005831'
 
 """### 문제 2. 데이터 다운로드 및 압축 해제하기
 
@@ -243,7 +243,10 @@ df.isna().sum()
 ### 문제 11. get_dummies를 이용한 범주형 데이터 전처리
 """
 
-X_cat =
+df.columns
+
+X_cat = df[['neighbourhood_group','neighbourhood','room_type','is_avail_zero','review_exists']]
+X_cat = pd.get_dummies(X_cat) #ohe hot vector 화 하기
 
 """### 문제 12. StandardScaler를 이용해 수치형 데이터 표준화하기
 
@@ -252,11 +255,17 @@ X_cat =
 from sklearn.preprocessing import StandardScaler
 
 # StandardScaler를 이용해 수치형 데이터를 표준화하기
-scaler = 
-X_num = 
+scaler = StandardScaler()
+X_num = df.drop(['price','neighbourhood_group','neighbourhood','room_type','last_reivew','is_avail_zero','review_exists'], axis = 1)
 
-X = 
-y =
+scaler.fit(X_num)
+X_scaled = scaler.transform(X_num)
+X_scaled = pd.DataFrame(X_scaled, index = X_num.index, columns = X_num.columns)
+
+X = pd.concat([X_scaled,X_cat], axis = 1)
+y = df['price']
+
+X.head()
 
 """### 문제 13. 학습데이터와 테스트데이터 분리하기
 
@@ -265,7 +274,7 @@ y =
 from sklearn.model_selection import train_test_split
 
 # train_test_split() 함수로 학습 데이터와 테스트 데이터 분리하기
-X_train, X_test, y_train, y_test =
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 1)
 
 """## Step 5. Regression 모델 학습하기
 
@@ -275,14 +284,18 @@ X_train, X_test, y_train, y_test =
 from xgboost import XGBRegressor
 
 # XGBRegressor 모델 생성/학습
-model_reg =
+model_reg = XGBRegressor()
+model_reg.fit(X_train, y_train)
 
 """### 문제 15. 모델 학습 결과 평가하기"""
 
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 # Predict를 수행하고 mean_absolute_error, rmse 결과 출력하기
-pred =
+# Predict를 수행하고 mean_absolute_error, rmse 결과 출력하기
+pred = model_reg.predict(X_test)
+print(mean_absolute_error(y_test, pred)) # 35.37 
+print(sqrt(mean_squared_error(y_test, pred))) # 49.39
 
 """## Step 6. 모델 학습 결과 심화 분석하기
 
@@ -291,10 +304,23 @@ pred =
 
 # y_test vs. pred Scatter 플랏으로 시각적으로 분석하기
 
+plt.scatter(x=y_test, y=pred)
+plt.plot([0,350],[0,350], 'r-')
+#일정구간마다 세로로 일자인 데이터들이있다 -> 수치형데이터가 상관성이 적어 범주형 데이터에 의존해서 그런듯
+#값이 낮은집을 좀 고평가하는 경향
+
 """### 문제 17. 에러 값의 히스토그램 확인하기
 
 """
 
 # err의 히스토그램으로 에러율 히스토그램 확인하기
-err = pred - y_test
+err = (pred - y_test) / y_test #에러율
+sns.histplot(err)
+plt.grid() #0보다 낮게 치우치지만 오른쪽으로 길게 늘어져 있음 -> 최소한 값을 양으로 뽑기때메 에러가 100프로는 갈수가 없다
 
+err = (pred - y_test)#에러율
+sns.histplot(err)
+plt.grid() #많은 값이 50불 이내로 overestimated 함
+
+#쓸법한 정보들 -> airbnb에 등록된 이름 -> 특이한 단어들이 많이쓰임 -> 이름을 분석하여 하면 좋을듯
+#-> 위도/경도를 지도에 뿌려보고 neighbour랑 잘 엮어서 써보기도 하면 좋을듯
