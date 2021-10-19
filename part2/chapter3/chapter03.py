@@ -200,6 +200,23 @@ rank_table.head(10)
 # 아래 셀과 동일하게 년도별 순위 변화를 시각화하기
 # Hint) plt.plot을 이용하고, 필요한 경우 데이터프레임을 변형하면서 그리시오.
 
+fig = plt.figure(figsize = (10,50))
+rank2020 = rank_table['2020'].dropna()
+for c in rank_table['2020'].dropna().index: #nan 값을뺀 나머지 국가들의 순위를 하나씩 돌려줌
+  t = rank_table.loc[c].dropna() # 각국가별로 연도별 랭크를 보여주게됨 #중간에 등수가 빠진 나라는 빼고 해서 그래프가 끊어지는걸 방지
+  plt.plot(t.index, t, '.-') #x축:연도 , y축: 연도별 랭킹, 선중간마다 점
+  
+
+plt.xlim(['2015','2020']) #15년도 부터 20년도를 딱 끝에맞춤
+plt.ylim([0, rank_table.max().max()+1]) #맥스하나면 #연도별 최하위권, 두개면 그중 최고 하위권, +1 은 그냥 위아래 공간 확보
+plt.yticks(rank2020, rank2020.index) #각 나라의 랭크를 나라이름으로 바꿔줌
+ax = plt.gca()
+ax.invert_yaxis() # y축 순서를 거꾸로 뒤집어줌
+ax.yaxis.set_label_position('right')
+ax.yaxis.tick_right() #y축을 우측으로 옮겨줌
+plt.tight_layout()
+plt.show()
+
 # 이 셀의 출력 내용이 사라지지 않게 조심하세요.
 
 """### 문제 9. 분야별로 나누어 점수 시각화하기"""
@@ -207,11 +224,32 @@ rank_table.head(10)
 # sns.barplot()을 이용하여 아래 셀과 동일하게 시각화하기
 # Hint) 필요에 따라 데이터프레임을 수정하여 사용하시오. 적절한 수정을 위해 누적합(pd.cumsum())을 활용하시오.
 
+fig = plt.figure(figsize = (6,8))
+data = df_all[df_all['year']== '2020']
+data = data.loc[data.index[:20]] #2020년 상위20등까지 가져오기
+
+d = data[data.columns[4:]].cumsum(axis = 1) #같은 나라별로 수치끼리 누적그래프 바 만들기
+d = d[d.columns[::-1]]  #residual부터(누적합이 가장많이 쌓인곳부터) 그리기
+d['country'] = data['country']
+
+sns.set_color_codes('muted') #톤 다운된 색깔로 변경
+colors = ['r', 'g','b','c','m','y','purple'][::-1] #각 요소별로 색깔 배정
+for idx, c in enumerate(d.columns[:-1]):
+  sns.barplot(x=c, y = 'country', data = d, label = c, color = colors[idx])
+
+plt.legend(loc = 'lower right')
+plt.title('Top 20 Happiness Scores in Detail')
+plt.xlabel('Happiness Score')
+sns.despine(left=True, bottom= True) #프레임 제거
+
 # 이 셀의 출력 내용이 사라지지 않게 조심하세요.
 
 """### 문제 10. Column간의 상관성 시각화하기"""
 
 # 상관성 Heatmap, Pairplot 등으로 상관성을 시각화하기
+sns.heatmap(df_all.corr('rank',axis = 1).corr(), annot = True, cmap = 'YlOrRd')
+
+sns.pairplot(df_all.drop('rank',axis = 1))
 
 """## Step 4. 모델 학습을 위한 데이터 전처리
 
