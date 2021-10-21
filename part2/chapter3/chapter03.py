@@ -247,7 +247,7 @@ sns.despine(left=True, bottom= True) #프레임 제거
 """### 문제 10. Column간의 상관성 시각화하기"""
 
 # 상관성 Heatmap, Pairplot 등으로 상관성을 시각화하기
-sns.heatmap(df_all.corr('rank',axis = 1).corr(), annot = True, cmap = 'YlOrRd')
+sns.heatmap(df_all.drop('rank', axis=1).corr(), annot=True, cmap='YlOrRd')
 
 sns.pairplot(df_all.drop('rank',axis = 1))
 
@@ -257,16 +257,17 @@ sns.pairplot(df_all.drop('rank',axis = 1))
 """
 
 # 학습할 모델의 입출력을 정의하시오. Column의 의미를 고려하여 선정하시오.
-col_input_list = 
-col_out =
+# 이미 행복 지수 자체는 요소들의 합이니까 다른 방식으로 학습해야함
+col_input_list = ['economy','family','health','freedom','generosity','trust']
+col_out = 'score'
 
 """### 문제 12. 학습데이터와 테스트데이터 분리하기
 
 """
 
 # 2015년 ~ 2019년도 데이터를 학습 데이터로, 2020년도 데이터를 테스트 데이터로 분리하기
-df_train = 
-df_test = 
+df_train = df_all[df_all['year'] != '2020']
+df_test = df_all[df_all['year'] == '2020']
 
 X_train = df_train[col_input_list]
 y_train = df_train[col_out]
@@ -280,7 +281,14 @@ y_test = df_test[col_out]
 from sklearn.preprocessing import StandardScaler
 
 # StandardScaler를 이용해 학습 데이터를 표준화하기
-scaler =
+scaler = StandardScaler()
+scaler.fit(X_train) #X를 scaler에 그냥 넣은 것과는 달리 x_train 을 fit함 -> x_test대해 완전히 blind로 가는것. (테스트를 넣어야할지 상황을 보고 하면됨)
+
+X_norm = scaler.transform(X_train)
+X_train = pd.DataFrame(X_norm,index = X_train.index, columns = X_train.columns)
+
+X_norm = scaler.transform(X_test)
+X_test = pd.DataFrame(X_norm,index = X_test.index, columns = X_test.columns)
 
 """## Step 5. Regression 모델 학습하기
 
@@ -289,8 +297,12 @@ scaler =
 
 from sklearn.linear_model import LinearRegression
 
+#Trust가 0점이라 데이터가 nan으로 되어있는 나라들이 있다 -> 0으로 바꿔줘야함
+X_train.fillna(0,inplace = True)
+
 # LinearRegression 모델 생성/학습
-model_lr =
+model_lr = LinearRegression()
+model_lr.fit(X_train, y_train)
 
 """### 문제 15. 모델 학습 결과 평가하기"""
 
@@ -298,14 +310,21 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from math import sqrt
 
 # Predict를 수행하고 mean_absolute_error, rmse 결과 출력하기
-pred =
+pred = model_lr.predict(X_test)
+print(mean_absolute_error(y_test,pred))
+print(sqrt(mean_squared_error(y_test,pred)))
 
 """### 문제 16. XGBoost Regression 모델 학습하기"""
 
 from xgboost import XGBRegressor
 
 # XGBRegressor 모델 생성/학습
-model_xgb =
+model_xgb = XGBRegressor()
+model_xgb.fit(X_train,y_train)
+
+pred = model_xgb.predict(X_test)
+print(mean_absolute_error(y_test,pred))
+print(sqrt(mean_squared_error(y_test,pred)))
 
 """### 문제 17. 모델 학습 결과 평가하기"""
 
@@ -319,14 +338,29 @@ pred =
 
 # y_test vs. pred Scatter 플랏으로 시각적으로 분석하기
 
+plt.scatter(x=y_test, y = pred)
+plt.plot([0,9],[0,9], 'r-')
+plt.show()
+#15~19년도 데이터로 20년 데이터를 예측해본것 -> 상당히 결과가 잘 나왔다
+
 """### 문제 19. LinearRegression 모델의 Coefficient 시각화하기
 
 """
 
 # model_lr.coef_ 시각화하기
 
+plt.bar(X_train.columns, model_lr.coef_)
+
+
+#econmoy가 가장큰 영향력을 준다
+#현재 standard dev로 보는것이고 이코노미의 편차가 크기때문에 영향력이 높다고 볼 수 있는부분
+#generesoity가 낮게 나온건 국가들이 generosity 점수가 크게 안변한다고 볼 수 잇음
+
 """### 문제 20. XGBoost 모델의 Feature Importance 시각화하기
 
 """
 
 # model_xgb.feature_importance_ 시각화하기
+
+plt.bar(X_train.columns, model_xgb.feature_importances_)
+
