@@ -252,12 +252,47 @@ sns.heatmap(df.corr(), annot = True, cmap = 'YlOrRd')
 
 # 범주형 데이터 중 범주가 너무 적은 경우 others 범주로 대체하기
 # Hint) value_counts()를 이용하여 범주별 개수를 확인
+pb = df['Publisher'].value_counts()
+print(pb)
+plt.plot(range(len(pb)),pb)
+#소수 유통사가 장악하고 있는 형세
+#상위 20개 밖에는 other로 묶는다
+
+df['Publisher'] = df['Publisher'].apply(lambda s: s if s not in pb[20:] else 'others')
+sns.countplot(x = 'Publisher',data = df)
+plt.xticks(rotation = 90) #적당한 수준으로 정리되었다
+
+fig = plt.figure(figsize = (15,5))
+sns.boxplot(x = 'Publisher', y = 'Global_Sales', data = df)
+plt.xticks(rotation = 90)
+#닌텐도 잘나감
+#sony는 플스거라 잘되는듯
+#electronic arts는 스포츠 브랜드라 잘되는듯
+#publsiher 를 카테고리로 이용하면 global sales를 잘 할 수 있을듯
+
+dev = df['Developer'].value_counts()
+plt.plot(range(len(dev)),dev)
+#이것또한 소수 개발사가 다 잡고있는 형세 -> 상위 20개와 기타로 나눈다
+
+df['Developer'] = df['Developer'].apply(lambda s: s if s not in dev[20:] else 'others')
+sns.countplot(x = 'Developer',data = df)
+plt.xticks(rotation = 90)
+
+fig = plt.figure(figsize = (15,5))
+sns.boxplot(x = 'Developer', y = 'Global_Sales', data = df)
+plt.xticks(rotation = 90)
+#닌텐도는 아웃라이어 조차 없다
+#기타를 제외하고 나머지는 그대로 써도 될만큼 좋은 통계값들을 가지고 있는듯함
 
 """### 문제 11. get_dummies를 이용한 범주형 데이터 전처리
 
 """
 
-X_cat =
+df.columns
+
+X_cat = df[['Platform', 'Genre', 'Publisher']]
+
+X_cat = pd.get_dummies(X_cat, drop_first = True)
 
 """## Step 4. 전국 판매량 Regression 모델 학습하기
 
@@ -269,27 +304,35 @@ from sklearn.preprocessing import StandardScaler
 
 # 전국 판매량 추정을 위해 적절한 입력과 출력 컬럼 선정
 # 수치형 데이터는 StandardScaler를 이용해 표준화
+X_num = df[['Year_of_Release','Critic_Score','Critic_Count']] #user의 평점이나 평가횟수는 발매량에 영향을 받은것이므로 빼는걸로 함
+scaler = StandardScaler()
+scaler.fit(X_num)
+X_scaled = scaler.transform(X_num)
+X_scaled = pd.DataFrame(X_scaled, index = X_num.index, columns = X_num.columns)
 
-scaler = 
-X = 
-y =
+X = pd.concat([X_scaled,X_cat], axis = 1) 
+y = df["Global_Sales"]
+
+X.head()
 
 # train_test_split() 함수로 학습 데이터와 테스트 데이터 분리하기
-X_train, X_test, y_train, y_test =
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size = 0.3, random_state = 1)
 
 """### 문제 13. XGBoost 모델 생성/학습하기"""
 
 from xgboost import XGBRegressor
 
 # XGBRegressor 모델 생성/학습
-model_xgb =
+model_xgb = XGBRegressor()
+model_xgb.fit(X_train,y_train)
 
 """### 문제 14. Linear Regression 모델 생성/학습하기"""
 
 from sklearn.linear_model import LinearRegression
 
 # LinearRegression 모델 생성/학습
-model_lr
+model_lr = LinearRegression()
+model_lr.fit(X_train, y_train)
 
 """### 문제 15. 모델 학습 결과 평가하기"""
 
@@ -297,55 +340,111 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from math import sqrt
 
 # Predict를 수행하고 mean_absolute_error, rmse 결과 출력하기
-pred_xgb = 
-pred_lr =
+pred_xgb = model_xgb.predict(X_test)
+pred_lr = model_lr.predict(X_test)
+
+print('XGB MAE: ',mean_absolute_error(y_test,pred_xgb))
+print('XGB RMSE: ', sqrt(mean_squared_error(y_test,pred_xgb)))
+
+print('LR MAE: ',mean_absolute_error(y_test,pred_lr))
+print('LR RMSE: ', sqrt(mean_squared_error(y_test,pred_lr)))
 
 """### 문제 16. 실제 값과 추측 값의 Scatter plot 시각화하기
 
 """
 
 # y_test vs. pred Scatter 플랏으로 시각적으로 분석하기
+plt.scatter(y_test, pred_xgb, alpha = 0.1)
+plt.plot([0,10],[0,10], 'r-')
+
+#낮은 값들로 예상되어 지는경향
+#적게 팔린애들은 좀 비싸게, 많이 팔리는 애들은 좀 낮게 예측됨
+#적게 팔린애들이 데이터가 많아 그쪽에 집중에서 학습을 한 결과 판매량이 많은 애들이 값이 덜 정확히 예측됨(애초에 많이 팔린애들이 아웃라이어에 있긴함)
+
+plt.scatter(y_test, pred_lr, alpha = 0.1)
+plt.plot([0,10],[0,10], 'r-')
+# 값들을 weighting에서 더하기만 해서 값이 올라가는 쪽으로 fit을 하여 낮은 값들이 음수로 떨어지는 일이 발생하기도 함
 
 """### 문제 17. XGBoost 모델의 Feature Importance 시각화하기"""
 
-
+fig = plt.figure(figsize = (15,5))
+plt.bar(X.columns, model_xgb.feature_importances_)
+plt.xticks(rotation = 90)
+plt.show()
+#pc가 플랫폼일때 큼(pc가 안팔린애들이 많기 때문일듯)
+#닌텐도는 잘팔린다란걸 전에 알수 잇듯이 중요도도 높게 나온듯
 
 """## Step 5. 유저 평점 Regression 모델 학습하기
 
 ### 문제 18. 유저 평점 추정을 위한 입출력 데이터 구성하기
 """
 
+df.columns
+
 # 유저 평점 추정을 위해 적절한 입력과 출력 컬럼 선정
 # 수치형 데이터는 StandardScaler를 이용해 표준화
 
-scaler = 
-X = 
-y =
+# 유저가 해당게임이 맘에 들어할지 여부
+
+X_num = df[['Year_of_Release','Critic_Score','Critic_Count']] #user의 평점이나 평가횟수는 발매량에 영향을 받은것이므로 빼는걸로 함
+scaler = StandardScaler()
+scaler.fit(X_num)
+X_scaled = scaler.transform(X_num)
+X_scaled = pd.DataFrame(X_scaled, index = X_num.index, columns = X_num.columns)
+
+X = pd.concat([X_scaled,X_cat], axis = 1) 
+#분리가 저 잘되기위해 x를 한번더 정의해줌
+
+y = df["User_Score"]
 
 # train_test_split() 함수로 학습 데이터와 테스트 데이터 분리하기
-X_train, X_test, y_train, y_test =
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size = 0.3, random_state = 1)
 
 """### 문제 19. XGBoost 모델 생성/학습하기"""
 
 # XGBRegressor 모델 생성/학습
-model_xgb =
+model_xgb = XGBRegressor()
+model_xgb.fit(X_train,y_train)
 
 """### 문제 20. Linear Regression 모델 생성/학습하기"""
 
 # LinearRegression 모델 생성/학습
-model_lr =
+model_lr = LinearRegression()
+model_lr.fit(X_train,y_train)
 
 """### 문제 21. 모델 학습 결과 평가하기"""
 
 # Predict를 수행하고 mean_absolute_error, rmse 결과 출력하기
-pred_xgb = 
-pred_lr =
+pred_xgb = model_xgb.predict(X_test)
+pred_lr = model_lr.predict(X_test)
+
+print('XGB MAE: ',mean_absolute_error(y_test,pred_xgb))
+print('XGB RMSE: ', sqrt(mean_squared_error(y_test,pred_xgb)))
+
+print('LR MAE: ',mean_absolute_error(y_test,pred_lr))
+print('LR RMSE: ', sqrt(mean_squared_error(y_test,pred_lr)))
 
 """### 문제 22. 실제 값과 추측 값의 Scatter plot 시각화하기
 
 """
 
 # y_test vs. pred Scatter 플랏으로 시각적으로 분석하기
+plt.scatter(y_test, pred_xgb, alpha = 0.1)
+plt.plot([0,10],[0,10], 'r-')
+
+#만족도를 좀 높게 예측하는 경향
+#측정값이 낮을수록 좀 높게 예측. 점수가 높은건 잘 예측
+
+plt.scatter(y_test, pred_lr, alpha = 0.1)
+plt.plot([0,10],[0,10], 'r-')
 
 """### 문제 23. XGBoost 모델의 Feature Importance 시각화하기"""
+
+fig = plt.figure(figsize = (15,5))
+plt.bar(X.columns, model_xgb.feature_importances_)
+plt.xticks(rotation = 90)
+plt.show()
+
+#critic score가 가장높다 -> 확실히 평론가가 평가를 많이하고 점수를 잘준게 판매량에 많은 영향을 준다고 보여진다
+#출시년도도 높지만 좀 무시해도 되긴할듯
 
