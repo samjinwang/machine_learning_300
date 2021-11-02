@@ -255,6 +255,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn import metrics
 
 # (문제) 로지스틱 회귀분석 모형을 만들어 lm에 저장합니다. solver는 'liblinear'로 설정합니다.
+lm = LogisticRegression(solver = 'liblinear')
 
 """https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html
 
@@ -262,10 +263,13 @@ from sklearn import metrics
 """
 
 # (문제) 로지스틱에서 고려해야할 Penalty의 형태 (Ridge, Lasso), regularization parameter range를 설정하여 이를 parameters에 dictionary 형태로 저장합니다.
+parameters = {'penalty':['l1', 'l2'],'C': [0.01,0.1,0.5,0.9,1,5,10], 'tol' : [1e-4,1e-2,1,1e2]} #C, penalty 로 각각의 회귀계수들이 너무 크지않고 0의 값을 갖도록 함
 
 # (문제) sklearn.model_selection.GridSearchCV를 활용해 cv값 10, n_jobs값은 n_thread로, scoreing은 "accuracy"로 Grid Search를 세팅하고 이를 GSLR에 저장합니다.
+GSLR = GridSearchCV(lm, parameters, cv = 10, n_jobs = n_thread, scoring = 'accuracy')
 
 # (문제) Grid Search를 fit함수를 활용하여 수행합니다.
+GSLR.fit(x_train,y_train) #cross validation
 
 # 최적의 파라미터 값 및 정확도 (Accuracy) 출력
 print('final params', GSLR.best_params_)   
@@ -274,10 +278,15 @@ print('best score', GSLR.best_score_)
 """### 문제 11. [로지스틱 회귀분석] 모형 평가 및 최적 로지스틱 모형 구축"""
 
 # (문제) predict 함수를 활용하여 예측 값을 구해 이를 predicted 에 저장합니다.
+predicted = GSLR.predict(x_test)
 
-# (문제) sklearn.metrics.confusion_matrix 활용하여 confusion_matrix를 구하고 이를 출력합니다.
+# (문제) sklearn.metrics.confusion_matrix 활용하여 confusion_matrix를 구하고 이를 출력합니다
+cMatrix = confusion_matrix(y_test,predicted)
+print(cMatrix)
+print('Accuracy:', GSLR.score(x_test,y_test))
 
 # (문제) sklearn.metrics.classification_report를 활용하여 report를 출력합니다.
+print(metrics.classification_report(y_test, predicted))
 
 # Commented out IPython magic to ensure Python compatibility.
 # Cross validation 과정에서 계산된 정확도 값들을 출력해줍니다.
@@ -286,7 +295,8 @@ stds = GSLR.cv_results_['std_test_score']
 for mean, std, params in zip(means, stds, GSLR.cv_results_['params']):
     print("%0.3f (+/-%0.03f) for %r"
 #           % (mean, std * 2, params))
-print()
+print() 
+#각가의 값을 변화했을 때 정확도가 어떤지 한번 봐봄
 
 """## Step 3. 의사결정나무 모형
 
@@ -296,18 +306,30 @@ print()
 from sklearn.tree import DecisionTreeClassifier
 
 # (문제) 의사결정나무 모형을 만들어 dt에 저장합니다.
+dt = DeprecationWarning()
 
 """https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeClassifier.html
 
 ### 문제 13. [의사결정나무] Grid Search 구축 (Loss function / Prunning)
 """
 
-# (문제) 의사결정나무에서 고려해야할 criterion, min_samples_split, max_depth, min_samples_leaf, max_features 등을 고려하여 Grid search를 수행합니다.
+# (문제) 의사결정나무에서 고려해야할 criterion, min_samples_split, max_depth, min_samples_leaf, max_features 등을 고려하여 Grid search를 수행합니다. -> pruning으로 복잡도를 낮춰 과적합 방지
 # GridSearchCV의 옵션은 cv=10, n_jobs=n_thread, scoreing="accuracy"로 설정합니다.
+parameters = {'criterion': ['gini','entropy'], 'min_samples_split':[2,5,10,15], 'max_depth' : [None,2],'min_samples_leaf':[1,3,10,15], 'max_features' : [None,'sqrt','log2']}
+
+GSDT=GridSearchCV(dt,parameters,cv=10,n_jobs=n_thread,scoring="accuracy")
+GSDT.fit(x_train,y_train)
+
+print('final params', GSDT.best_params_)   
+print('acc', GSDT.best_score_)
 
 """### 문제 14. [의사결정나무]  모형 평가 및 최적 의사결정나무 구축"""
 
 # (문제) predict 함수를 활용하여 예측 값을 구해 이를 predicted 에 저장하고 이를 출력하며 classification_report 또한 출력합니다.
+predicted=GSDT.predict(x_test)
+CMatrix = confusion_matrix(y_test, predicted)
+print(cMatrix)
+print(round(GSDT.score(x_test,y_test),3))
 
 # Train에서의 종속변수의 분포
 print(y_train.value_counts())
@@ -335,6 +357,9 @@ graph
 from sklearn.ensemble import RandomForestClassifier
 
 # (문제) Random Forest 모형을 만들어 rf에 저장합니다.
+rf=RandomForestClassifier()
+
+
 
 """https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
 
@@ -343,10 +368,19 @@ from sklearn.ensemble import RandomForestClassifier
 
 # (문제) Random Forest에서 고려해야할 n_estimators, min_samples_split, max_depth, min_samples_leaf, max_features 등을 고려하여 Grid search를 수행합니다.
 # GridSearchCV의 옵션은 cv=10, n_jobs=n_thread, scoreing="accuracy"로 설정합니다.
+parameters={'n_estimators':[50,100],'criterion':['entropy'],'min_samples_split':[2,5],'max_depth':[None,2],'min_samples_leaf':[1,3,10],'max_features':['sqrt']} #트리가 많으면 좋지만 너무 오래걸림
+GSRF=GridSearchCV(rf,parameters,cv=10,n_jobs=n_thread,scoring="accuracy")
+GSRF.fit(x_train,y_train)
+print('final params',GSRF.best_params_)
+print('best score',GSRF.best_score_)
 
 """### 문제 17. [Random Forest] 모형 평가 및 최적  Random Forest 구축"""
 
 # (문제) predict 함수를 활용하여 예측 값을 구해 이를 predicted 에 저장하고 이를 출력하며 classification_report 또한 출력합니다.
+predicted=GSRF.predict(x_test)
+cMatrix=confusion_matrix(y_test,predicted)
+print(cMatrix)
+print(metrics.classification_report(y_test,predicted))
 
 """## Step 5. Support Vector Machine
 
@@ -364,6 +398,7 @@ Image reference: Fastcampus 머신러닝과 데이터 분석 A-Z
 from sklearn import svm
 
 # (문제) Support Vector Machine을 만들어 svc에 저장합니다.
+svc=svm.SVC()
 
 """https://scikit-learn.org/stable/modules/generated/sklearn.svm.SVC.html
 
@@ -372,10 +407,15 @@ from sklearn import svm
 
 # (문제) Support Vector Machine에서 고려해야할 C, kernel, gamma 등을 고려하여 Grid search를 수행합니다.
 # GridSearchCV의 옵션은 cv=10, n_jobs=n_thread, scoreing="accuracy"로 설정합니다.
+parameters={'C':[0.01,0.1,0.5,0.9,1,5,10],'kernel':['linear','rbf','poly'],'gamma':[0.1,1,10]} #선형,비선형으로 다 margin을 만들어봄
+GS_SVM=GridSearchCV(svc,parameters,cv=10,n_jobs=n_thread,scoring="accuracy")
+GS_SVM.fit(x_train,y_train)
 
 """### 문제 20. [SVM] 모형 평가 및 최적 Support Vector Machine 구축"""
 
 # (문제) predict 함수를 활용하여 예측 값을 구해 이를 predicted 에 저장하고 이를 출력하며 classification_report 또한 출력합니다.
+print('final params',GS_SVM.best_params_)
+print('best score',GS_SVM.best_score_)
 
 """## Step 6. 신경망 모형
 
@@ -397,6 +437,7 @@ from sklearn import svm
 from sklearn.neural_network import MLPClassifier
 
 # (문제) 신경망 모형을 만들어 ann_model에 저장합니다.
+nn_model=MLPClassifier(random_state=1)
 
 """https://scikit-learn.org/stable/modules/generated/sklearn.neural_network.MLPClassifier.html
 
@@ -410,16 +451,29 @@ from sklearn.neural_network import MLPClassifier
 
 x_train.shape
 
-1552/(10*(26+1))
+1552/(10*(26+1)) # 이계산을 통해 factor의 범위를 찾고 노드수를 결정한다
 
 1552/(1*(26+1))
 
 # (문제) 신경망 모형에서 고려해야할 alpha, hidden_layer_sizes, activation등을 고려하여 Grid search를 수행합니다.
 # GridSearchCV의 옵션은 cv=10, n_jobs=n_thread, scoreing="accuracy"로 설정합니다.
+parameters={'alpha':[1e-3,1e-1,1e1],'hidden_layer_sizes':[(5),(10),(60)],'activation':['tanh','relu'],'solver':['adam','lbfgs']}
+GS_NN=GridSearchCV(nn_model,parameters,cv=10,n_jobs=n_thread,scoring="accuracy")
+GS_NN.fit(x_train,y_train)
 
 """### 문제 23. [ANN] 모형 평가 및 최적 신경망 모형 구축"""
 
 # (문제) predict 함수를 활용하여 예측 값을 구해 이를 predicted 에 저장하고 이를 출력하며 classification_report 또한 출력합니다.
+print('final params', GS_NN.best_params_)
+print('best score', GS_NN.best_score_)
+
+# Commented out IPython magic to ensure Python compatibility.
+means = GS_NN.cv_results_['mean_test_score']
+stds = GS_NN.cv_results_['std_test_score']
+for mean, std, params in zip(means, stds, GS_NN.cv_results_['params']):
+    print("%0.3f (+/-%0.03f) for %r"
+#           % (mean, std * 2, params))
+print()
 
 """https://playground.tensorflow.org
 
@@ -440,6 +494,7 @@ import xgboost as xgb
 from sklearn.metrics import accuracy_score
 
 # (문제) xgboost 모형을 만들어 xgb_model에 저장합니다. objective='binary:logistic'로 설정합니다.
+xgb_model=xgb.XGBClassifier(objective='binary:logistic')
 
 """https://xgboost.readthedocs.io/en/latest/parameter.html
 
@@ -448,6 +503,16 @@ from sklearn.metrics import accuracy_score
 
 # (문제) xgboost에서 고려해야할 max_depth, min_child_weight, gamma, colsample_bytree, n_estimators 등을 고려하여 Grid search를 수행합니다.
 # GridSearchCV의 옵션은 cv=10, n_jobs=n_thread, scoreing="accuracy"로 설정합니다.
+parameters={
+    'max_depth':[5,8],
+    'min_child_weight':[1,5],
+    'gamma':[0,1],
+    'colsample_bytree':[0.8,1],
+    'colsample_bylevel':[0.9,1],
+    'n_estimators':[50,100]
+}
+GS_xgb=GridSearchCV(xgb_model,param_grid=parameters,cv=10,n_jobs=n_thread,scoring="accuracy")
+GS_xgb.fit(x_train,y_train)
 
 """https://xgboost.readthedocs.io/en/latest/tutorials/param_tuning.html
 
@@ -455,6 +520,25 @@ from sklearn.metrics import accuracy_score
 """
 
 # (문제) predict 함수를 활용하여 예측 값을 구해 이를 predicted 에 저장하고 이를 출력하며 classification_report 또한 출력합니다.
+print('final params',GS_xgb.best_params_)
+print('best score',GS_xgb.best_score_)
+
+parameters2={
+    'max_depth':[3,5,7],
+    'min_child_weight':[1],
+    'gamma':[0],
+    'colsample_bytree':[1],
+    'colsample_bylevel':[1],
+    'n_estimators':[100,150]
+}
+
+GS_xgb2=GridSearchCV(xgb_model,param_grid=parameters2,cv=10,n_jobs=n_thread,scoring="accuracy")
+GS_xgb2.fit(x_train,y_train)
+
+predicted=GS_xgb2.predict(x_test)
+cMatrix=confusion_matrix(y_test,predicted)
+print(cMatrix)
+print(metrics.classification_report(y_test,predicted))
 
 """### 문제 27. [Boosting] lightGBM 기본 모형 만들기
 
@@ -475,13 +559,32 @@ import lightgbm as lgb
 
 # (문제) lightGBM에서 주로 고려해야할 num_leaves, min_data_in_leaf, colsample_bytree, n_estimators 등을 고려하여 Grid search를 수행합니다.
 # GridSearchCV의 옵션은 cv=10, n_jobs=n_thread, scoreing="accuracy"로 설정합니다.
+lgbm_model=lgb.LGBMClassifier(objecve='binary')
 
-"""https://lightgbm.readthedocs.io/en/latest/Parameters-Tuning.html
+"""https://lightgbm.readthedocs.io/en/latest/Parameters-Tuning.html"""
 
-### 문제 29. [Boosting] 모형 평가 및 최적 lightGBM 모형 구축
-"""
+
+
+"""### 문제 29. [Boosting] 모형 평가 및 최적 lightGBM 모형 구축"""
 
 # (문제) predict 함수를 활용하여 예측 값을 구해 이를 predicted 에 저장하고 이를 출력하며 classification_report 또한 출력합니다.
+parameters={
+    'num_leaves':[32,64,128],
+    'min_data_in_leaf':[1,5,10],
+    'colsample_bytree':[0.8,1],
+    'n_estimators':[100,150]
+}
+
+GS_lgbm=GridSearchCV(lgbm_model,parameters,cv=10,n_jobs=n_thread,scoring="accuracy")
+GS_lgbm.fit(x_train,y_train)
+
+print('final params',GS_lgbm.best_params_)
+print('best score',GS_lgbm.best_score_)
+
+predicted=GS_lgbm.predict(x_test)
+cMatrix=confusion_matrix(y_test,predicted)
+print(cMatrix)
+print(metrics.classification_report(y_test,predicted))
 
 """## Chapter 1. 요약 및 마무리
 - 학습한 것:
@@ -492,3 +595,4 @@ import lightgbm as lgb
  - 제가 각 방법론의 최적 모형을 구축하면서 코멘트 드렸던 모형 별 중요 파라미터와 이 파라미터들이 가지는 의미, 파라미터들의 변화에 따른 예측력의 변화 경향성을 바탕으로 여러 데이터에서 데이터의 특성에 따른 모델의 성능과 최적 파라미터가 가지는 경향성을 경험적으로 익히시는 것이 필요합니다.
 
 """
+
