@@ -432,31 +432,54 @@ Image Reference: https://en.wikipedia.org/wiki/Eigenvalues_and_eigenvectors
 """
 
 ## (문제) X_1 데이터의 각 변수를 평균이 0이 되도록 만들어 mX에 저장합니다.이렇게 진행하면 mX의 Quadratic 형태가 Covariance와 상수배가 됩니다.
+mX = X_1
+for i in range(X_1.shape[1]): #각 칼럼에 접근
+  mX[:,i]= mX[:,i]-np.mean(X_1[:,i]) #각 컬럼에 접근후 평균을 빼줌 -> 센터링
 
 ## (문제) numpy.cov를 활용하여 mX의 공분산행렬을 구하여 A에 저장합니다.
+A = np.cov(mX.transpose())
 
 ## (문제) numpy.linalg.svd를 활용하여 SVD를 진행하여 aU, aD, aY에 저장합니다.
+aU,aD,aV = np.linalg.svd(A)
 
 ## (문제) PC score를 구해내어서 XY에 저장합니다. mX 행렬에 eigenvector를 곱하여 구합니다.
+XV = np.dot(mX,aV)
 
-plt.scatter(mX[:,0],mX[:,1],color="black")
-plt.scatter(XV[:,0],XV[:,1],color="green")
+plt.scatter(mX[:,0],mX[:,1],color="black") #기존데이터의 두컬럼들
+plt.scatter(XV[:,0],XV[:,1],color="green") #pc score의 두 컬럼들
 origin = (0, 0) 
-plt.quiver(origin[0],origin[1], aV[0,0], aV[1,0], color=['r','b'], scale=3)
+plt.quiver(origin[0],origin[1], aV[0,0], aV[1,0], color=['r','b'], scale=3) #eigenvector
 plt.quiver(origin[0],origin[1], aV[0,1], aV[1,1], color=['r','b'], scale=3)
 plt.show()
+
+#원래 데이터는 우상향  -> covariance의 diagonal텀이 양수라는 뜻
+#이걸 곱해주면 이 우상향하는 방향으로 늘어나게끔 변환을 해준다는뜻
+# 그방향의 장단축을 eigenvector로 표현해줌, 각 축의 길이(중요성)를 eigenvalue로 표현
+# 이 축에따라 x,y축의 선형관계를 없에준다 (pc스코어가 선형적인 특성을 없에줌)
+# -> 원래그래프는 위아래 좌우로 둘다 퍼져잇는데 변환후 좌우로만 퍼져있음 -> 상대적으로 다른축의 중요도가 덜해짐
 
 """### 문제 6. [PCA] PCA 진행 및 결과 해석"""
 
 from sklearn.decomposition import PCA
 
 ## (문제) sklearn.decomposition.PCA 활용하여 PCA를 진행한 후 pca에 저장합니다.
+pca = PCA()
+pca.fit(X_1)
 
 ## (문제) PC score를  PCscore에 저장하고 앞서 구한 XV와 같거나 부호만 다름을 확인합니다.
+PCscore = pca.transform(X_1)
+print(PCscore[0:5,:])
+print(XV[0:5,:])
 
 ## (문제) Eigen vector를 eigens_v에 저장하고 앞서 구한 aV와 같거나 부호만 다름을 확인합니다.
+eigene_v = pca.components_.transpose()
+eigene_v
+print(aV)
+print(eigene_v)
 
 ## (문제) Eigen values를 구하고  앞서 구한 aD와 같음을 확인합니다.
+print(pca.explained_variance_)
+print(aD)
 
 mX=X_1
 for i in range(X_1.shape[1]):
@@ -465,8 +488,8 @@ for i in range(X_1.shape[1]):
 plt.scatter(mX[:,0],mX[:,1],color="black")
 plt.scatter(PCscore[:,0],PCscore[:,1],color="green")
 origin = (0,0) # origin point
-plt.quiver(*origin, eigens_v[0,0], eigens_v[1,0], color=['r','b'], scale=3)
-plt.quiver(*origin, eigens_v[0,1], eigens_v[1,1], color=['r','b'], scale=3)
+plt.quiver(*origin, eigene_v[0,0], eigene_v[1,0], color=['r','b'], scale=3)
+plt.quiver(*origin, eigene_v[0,1], eigene_v[1,1], color=['r','b'], scale=3)
 plt.show()
 
 """### 문제 7. [PCA] PC를 활용한 차원 축소"""
@@ -475,11 +498,23 @@ plt.show()
 label = ['PC1', 'PC2']
 index = np.arange(len(label))
 
-plt.scatter(PCscore[:,0],PCscore[:,1])
+plt.bar(index,pca.explained_variance_)
+plt.ylabel('Eigen value')
+plt.xticks(index,label)
+
+plt.scatter(PCscore[:,0],PCscore[:,1]) #현재는 pc1이 pc2보다 더 중요하다는걸 볼 수 있다
 plt.show()
 
 ## (문제) PC1 만을 활용하여 KMeans clustering을 진행한 후 해당 클러스터로 색상을 넣어 X_1의 Scatter plot을 그립니다.
 # 아래 PC1_matrix를 활용합니다.
+PC1_matrix = np.matrix(PCscore[:,0]).transpose()
+
+km = KMeans(n_clusters=2, random_state=1)
+km.fit(PC1_matrix)
+y_km = km.labels_
+color_code = {0:'Orange', 1: 'Blue'}
+
+sns.scatterplot(x = X_1[:,0],y = X_1[:,1], c = [color_code.get(i) for i in y_km])
 
 """##Step 4. 비선형 관계 데이터에의 적용
 
@@ -491,32 +526,91 @@ plt.show()
 color_code = {0:'Orange', 1:'Skyblue'}
 plt.figure(figsize=(7,7))
 
+km = KMeans(n_clusters=2, random_state=1)
+km.fit(X_2)
+y_km = km.labels_
+
+sns.scatterplot(x = X_2[:,0], y = X_2[:,1], c = [color_code.get(i) for i in y_km])
+plt.show()
+
+#비선형 데이터를 k_means에 넣었더니 직선기준으로 반반 되어버림
+#단순한 거리계산으로 안됨 -> kernel을 써야함 -> k means는 불가능
+
 """### 문제 9. PCA의 비선형 관계 데이터에의 적용"""
 
 ## (문제) 비선형 관계 데이터인 X_2를 바탕으로 sklearn.decomposition.PCA 활용하여 PCA를 진행한 후
 # PC score에 대하여 seaborn.scatterplot을 이용하고 클러스터별 color_code를 적용하여 플랏을 그립니다.
 # 원본 데이터 (alpha=0.1)와 PC score (alpha=0.5)를 플랏을 함께 그린 뒤 비교하여 어떻게 변했는지를 살핍니다.
+pca = PCA()
+pca.fit(X_2)
+eigen_v = pca.components_.transpose()
+PCscore = pca.transform(X_2)
+color_code = {0: 'orange', 1: 'skyblue', 2: 'green'}
 
-"""### 문제 10. Interleaving half circles 데이터 생성 및 K-means, PCA 적용"""
+mX = X_2
+for i in range(X_2.shape[1]):
+  mX[:,i] = mX[:,i] - np.mean(mX[:,i])
+
+plt.figure(figsize = (8,8))
+
+sns.scatterplot(mX[:,0], mX[:,1], c = [color_code.get(i) for i in y_2], alpha = 0.1)
+sns.scatterplot(PCscore[:,0], PCscore[:,1], c = [color_code.get(i) for i in y_2],alpha = 0.5)
+origin = (0,0)
+plt.quiver(*origin, eigene_v[0,0], eigene_v[1,0], color=['r'], scale=3)
+plt.quiver(*origin, eigene_v[0,1], eigene_v[1,1], color=['b'], scale=3)
+plt.show()
+
+"""### 문제 11. Spiral 데이터 생성 및 K-means, PCA 적용"""
 
 from sklearn.datasets import make_moons
 
 # (문제) sklearn.datasets.make_moons를 활용하여 n_samples=300, random_state=1을 적용하여 데이터 생성하여 X_3, y_3에 저장.
+X_4,y_4 = classification.make_spiral(n_samples_per_class=500,n_classes=2,n_rotations=2,gap_between_spiral=30,noise=0.05)
 
 # (문제) matplotlib.pyplot.scatter을 활용하고 아래의 클러스터별 color_code를 적용하여 플랏을 그립니다.
 plt.figure(figsize=(7,7))
-color_code = {0:'red', 1:'blue'}
+color_code = {0:'Orange', 1:'Skyblue'}
+
+sns.scatterplot(x=X_4[:,0],y=X_4[:,1],c=[color_code.get(i) for i in y_4])
+plt.show()
 
 # (문제) 비선형 관계 데이터인 X_3를 바탕으로 sklearn.cluster.KMeans를 활용하여 클러스터를 생성한 후
 # seaborn.scatterplot을 이용하고 클러스터별 color_code를 적용하여 플랏을 그립니다.
 color_code = {0:'red', 1:'blue'}
 plt.figure(figsize=(7,7))
+km = KMeans(n_clusters = 2, random_state = 1)
+km.fit(X_4)
+y_km = km.labels_
+plt.scatter(X_4[:,0], X_4[:,1], c = [color_code.get(i) for i in y_km],alpha = 0.5)
+plt.show()
 
 ## (문제) 비선형 관계 데이터인 X_3를 바탕으로 sklearn.decomposition.PCA 활용하여 PCA를 진행한 후
 # PC score에 대하여 seaborn.scatterplot을 이용하고 클러스터별 color_code를 적용하여 플랏을 그립니다.
 # 원본 데이터 (alpha=0.1)와 PC score (alpha=0.5)를 비교하여 어떻게 변했는지를 살핍니다.
 
-"""### 문제 11. Spiral 데이터 생성 및 K-means, PCA 적용"""
+pca = PCA()
+pca.fit(X_4)
+eigen_v = pca.components_.transpose()
+PCscore = pca.transform(X_4)
+color_code = {0: 'Red', 1: 'Blue'}
+
+mX = X_4 
+for i in range(X_4.shape[1]):
+  mX[:,i] = mX[:,i] - np.mean(mX[:,i])
+
+plt.figure(figsize = (8,8))
+
+# sns.scatterplot(mX[:,0], mX[:,1], c = [color_code.get(i) for i in y_4], alpha = 0.1)
+sns.scatterplot(mX[:,0], mX[:,1], c = [color_code.get(i) for i in y_4], alpha=0.1)
+
+sns.scatterplot(PCscore[:,0], PCscore[:,1], c = [color_code.get(i) for i in y_4],alpha = 0.5)
+origin = (0,0)
+plt.quiver(*origin, eigene_v[0,0], eigene_v[1,0], color=['r'], scale=3)
+plt.quiver(*origin, eigene_v[0,1], eigene_v[1,1], color=['b'], scale=3)
+plt.show()
+
+"""
+### 문제 10. Interleaving half circles 데이터 생성 및 K-means, PCA 적용"""
 
 !pip install git+https://github.com/lovit/synthetic_dataset
 
@@ -524,19 +618,67 @@ from soydata.data import *
 
 # (문제) soydata.data.classification.make_spiral를 활용하여 n_samples_per_class=500,n_classes=2,
 # n_rotations=3, gap_between_spiral=10, gap_between_start_point=1, noise=0.1 을 적용하여 데이터 생성하여 X_4, y_4에 저장.
+X_3, y_3 = make_moons(n_samples = 360, random_state= 1)
 
 # (문제) matplotlib.pyplot.scatter을 활용하고 아래의 클러스터별 color_code를 적용하여 플랏을 그립니다
 plt.figure(figsize=(7,7))
 color_code = {0:'Orange', 1:'Skyblue'}
+
+plt.scatter(X_3[:,0], X_3[:,1], c = [color_code.get(i) for i in y_3],alpha = 0.5)
+plt.show()
 
 # (문제) 비선형 관계 데이터인 X_4를 바탕으로 sklearn.cluster.KMeans를 활용하여 클러스터를 생성한 후
 # seaborn.scatterplot을 이용하고 클러스터별 color_code를 적용하여 플랏을 그립니다.
 color_code = {0:'Orange', 1:'Skyblue'}
 plt.figure(figsize=(7,7))
 
+km = KMeans(n_clusters = 2, random_state = 1)
+km.fit(X_3)
+y_km = km.labels_
+plt.scatter(X_3[:,0], X_3[:,1], c = [color_code.get(i) for i in y_km],alpha = 0.5)
+plt.show()
+
 ## (문제) 비선형 관계 데이터인 X_4를 바탕으로 sklearn.decomposition.PCA 활용하여 PCA를 진행한 후
 # PC score에 대하여 seaborn.scatterplot을 이용하고 클러스터별 color_code를 적용하여 플랏을 그립니다.
 # 원본 데이터 (alpha=0.1)와 PC score (alpha=0.5)를 비교하여 어떻게 변했는지를 살핍니다.
+pca = PCA()
+pca.fit(X_3)
+eigen_v = pca.components_.transpose()
+PCscore = pca.transform(X_3)
+color_code = {0: 'Red', 1: 'Blue'}
+
+mX = X_3 
+for i in range(X_3.shape[1]):
+  mX[:,i] = mX[:,i] - np.mean(mX[:,i])
+
+plt.figure(figsize = (8,8))
+
+# sns.scatterplot(mX[:,0], mX[:,1], c = [color_code.get(i) for i in y_3], alpha = 0.1)
+sns.scatterplot(mX[:,0], mX[:,1], c = [color_code.get(i) for i in y_3], alpha=0.1)
+
+sns.scatterplot(PCscore[:,0], PCscore[:,1], c = [color_code.get(i) for i in y_3],alpha = 0.5)
+origin = (0,0)
+plt.quiver(*origin, eigene_v[0,0], eigene_v[1,0], color=['r'], scale=3)
+plt.quiver(*origin, eigene_v[0,1], eigene_v[1,1], color=['b'], scale=3)
+plt.show()
+
+# pca=PCA()
+# pca.fit(X_3)
+# PCscore=pca.transform(X_3)
+# eigens_v=pca.components_.transpose()
+# color_code={0:'red',1:'blue'}
+
+# mX=X_3
+# for i in range(X_3.shape[1]):
+#   mX[:,i]=mX[:,i]-np.mean(mX[:,i])
+
+# plt.figure(figsize=(7,7))
+
+# sns.scatterplot(mX[:,0],mX[:,1],c=[color_code.get(i) for i in y_3],alpha=0.1)
+# sns.scatterplot(PCscore[:,0],PCscore[:,1],c=[color_code.get(i) for i in y_3],alpha=0.5)
+# origin=(0,0)
+# plt.quiver(*origin,eigens_v[0,0],eigens_v[1,0],color="r",scale=3)
+# plt.quiver(*origin,eigens_v[0,1],eigens_v[1,1],color="b",scale=3)
 
 """##Step 5. Kernel PCA
 
