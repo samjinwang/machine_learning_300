@@ -709,7 +709,57 @@ https://www.geogebra.org/3d/evstbcjx
 # 본 과정은 gamma의 범위를 좁혀가며 여러번 진행될 수 있습니다.
 from sklearn.decomposition import KernelPCA
 
+g_start=-50
+g_end=50
+g_power = np.arange(g_start,g_end, (g_end-g_start)/25)
+
+fig, axs = plt.subplots(nrows=5,ncols=5,figsize=(30,30),sharex=False,sharey=False)
+
+for n, ax in enumerate(axs.flatten()):
+  g_value=10**g_power[n]
+  scikit_kpca=KernelPCA(n_components=2,kernel='rbf',gamma=g_value)
+  X_skernpca = scikit_kpca.fit_transform(X_2)
+  ax.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_2,alpha=0.5)
+  ax.set_title('Power of gamma'+str(g_power[n]),size=12)
+
 ## (문제) 적정한 Gamma를 결정하고 이를 바탕으로 플랏을 그립니다.
+g_start = -18
+g_end = 2
+g_power = np.arange(g_start,g_end, (g_end-g_start)/25) #gamma값은 분산의 역수, 분산이 데이터 그 자체에 영향을 받음
+
+fig, axs = plt.subplots(nrows = 5, ncols = 5, figsize = (30,30), sharex = False, sharey = False)
+
+for n, ax in enumerate(axs.flatten()): #gamma를 50부터 4씩 줄여나가면서 해봄 -> gamma가 크면 (= 분산이 작으면) 너무 뾰족해지고, 분산이 크면 kernel이 의마가 없어짐. 분모가 아예없어지기 직전인 값들로 다시 해줌
+  g_value = 10**g_power[n]
+  scikit_kpca = KernelPCA(n_components =2, kernel = 'rbf', gamma = g_value)
+  X_skernpca = scikit_kpca.fit_transform(X_2)
+  ax.scatter(X_skernpca[:,0], X_skernpca[:,1], c = y_2, alpha = 0.5)
+  ax.set_title('Power of Gamma' + str(g_power[n]),size = 12)
+
+#-1.19 0.40 사이를 다시 봐보면 될듯
+
+g_start = -1.2
+g_end = 0.4
+g_power = np.arange(g_start,g_end, (g_end-g_start)/25) #gamma값은 분산의 역수, 분산이 데이터 그 자체에 영향을 받음
+
+fig, axs = plt.subplots(nrows = 5, ncols = 5, figsize = (30,30), sharex = False, sharey = False)
+
+for n, ax in enumerate(axs.flatten()): #gamma를 50부터 4씩 줄여나가면서 해봄 -> gamma가 크면 (= 분산이 작으면) 너무 뾰족해지고, 분산이 크면 kernel이 의마가 없어짐. 분모가 아예없어지기 직전인 값들로 다시 해줌
+  g_value = 10**g_power[n]
+  scikit_kpca = KernelPCA(n_components =2, kernel = 'rbf', gamma = g_value)
+  X_skernpca = scikit_kpca.fit_transform(X_2)
+  ax.scatter(X_skernpca[:,0], X_skernpca[:,1], c = y_2, alpha = 0.5)
+  ax.set_title('Power of Gamma' + str(g_power[n]),size = 12)
+
+# -0.943~ -0.624에 값들이 색깔벼로 잘 나누어짐
+
+g_power_val=-0.94
+g_value=10**g_power_val
+scikit_kpca=KernelPCA(n_components=2,kernel='rbf',gamma=g_value)
+X_skernpca = scikit_kpca.fit_transform(X_2)
+
+plt.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_2,alpha=0.3)
+plt.show()
 
 """- Polynomial kernel PCA로 진행."""
 
@@ -719,6 +769,20 @@ from sklearn.decomposition import KernelPCA
 # 이를 결정하기 위하여 grid를 25개로 주고, 25개의 다양한 degree 값에 대하여 KenrnelPCA를 진행하고 플랏을 그린 후 적정 degree에 대하여 고민해봅니다.
 # 본 과정은 degree의 범위를 좁혀가며 여러번 진행될 수 있습니다.
 # 적정 degree를 찾았다면, gamma, coef0에 대해서도 마찬가지로 진행합니다.
+g_start=1
+g_end=19
+g_power = np.arange(g_start,g_end, (g_end-g_start)/9)
+
+fig, axs = plt.subplots(nrows=3,ncols=3,figsize=(20,20),sharex=False,sharey=False)
+
+for n, ax in enumerate(axs.flatten()):
+  g_value=10**g_power[n]
+  scikit_kpca=KernelPCA(n_components=2,kernel='poly',degree=g_power[n])
+  X_skernpca = scikit_kpca.fit_transform(X_2)
+  ax.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_2,alpha=0.5)
+  ax.set_title('degree'+str(g_power[n]),size=12)
+
+#너무 비선형이라 poly로는 문제를 해결하기 어렵다
 
 """- Sigmoid kernel PCA로 진행."""
 
@@ -728,6 +792,53 @@ from sklearn.decomposition import KernelPCA
 # 이를 결정하기 위하여 grid를 25개로 주고, 25개의 다양한 gamma값에 대하여 KenrnelPCA를 진행하고 플랏을 그린 후 적정 gamma 값에 대하여 고민해봅니다.
 # 본 과정은 gamma의 범위를 좁혀가며 여러번 진행될 수 있습니다.
 # gamma가 결정되었다면 coef0값 또한 같은 방식으로 찾아줍니다.
+
+g_start = -16.2
+g_end= -16
+g_power = np.arange(g_start,g_end,(g_end-g_start)/25)
+
+fig, axs = plt.subplots(nrows=5,ncols=5,figsize=(30,30),sharex=False,sharey=False)
+
+for n, ax in enumerate (axs.flatten()):
+  g_value=10**(g_power[n])
+  scikit_kpca=KernelPCA(n_components=2,kernel='sigmoid',gamma=g_value)
+  X_skernpca = scikit_kpca.fit_transform(X_2)
+  ax.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_2,alpha=0.5)
+  ax.set_title('degree'+str(g_power[n]),size=12)
+  
+plt.show()
+
+#-16.4에서 어느정도 비선형을 완화시켜주지면 약간 아쉬움
+
+g_start = -6
+g_end= 2
+g_power = np.arange(g_start,g_end,(g_end-g_start)/25)
+
+fig, axs = plt.subplots(nrows=5,ncols=5,figsize=(30,30),sharex=False,sharey=False)
+
+for n, ax in enumerate (axs.flatten()):
+  g_value=10**(-16.096)
+  scikit_kpca=KernelPCA(n_components=2,kernel='sigmoid',gamma=g_value,coef0=g_power[n])
+  X_skernpca = scikit_kpca.fit_transform(X_2)
+  ax.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_2,alpha=0.5)
+  ax.set_title('coef1'+str(g_power[n]),size=12)
+  
+plt.show()
+
+g_value=10**(-16.096)
+scikit_kpca=KernelPCA(n_components=2,kernel='sigmoid',gamma=g_value,coef0=g_power[9])
+X_skernpca = scikit_kpca.fit_transform(X_2)
+plt.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_2,alpha=0.5)
+plt.show()
+
+PC1_matrix=np.matrix(X_skernpca[:,0]).transpose()
+km=KMeans(n_clusters=3,random_state=1)
+km.fit(PC1_matrix)
+
+y_km=km.labels_
+
+plt.figure(figsize=(7,7))
+sns.scatterplot(x=X_2[:,0],y=X_2[:,1],c=y_km)
 
 """### 문제 13. [Kernel PCA] Kernel PCA를 활용하여 비선형 패턴 구분해내기 (Interleaving half circles)
 
@@ -740,6 +851,32 @@ from sklearn.decomposition import KernelPCA
 # 이를 결정하기 위하여 grid를 25개로 주고, 25개의 다양한 gamma값에 대하여 KenrnelPCA를 진행하고 플랏을 그린 후 적정 gamma에 대하여 고민해봅니다.
 # 본 과정은 gamma의 범위를 좁혀가며 여러번 진행될 수 있습니다.
 
+g_start=-50
+g_end=50
+g_power = np.arange(g_start,g_end, (g_end-g_start)/25)
+
+fig, axs = plt.subplots(nrows=5,ncols=5,figsize=(30,30),sharex=False,sharey=False)
+
+for n, ax in enumerate(axs.flatten()):
+  g_value=10**g_power[n]
+  scikit_kpca=KernelPCA(n_components=2,kernel='rbf',gamma=g_value)
+  X_skernpca = scikit_kpca.fit_transform(X_3)
+  ax.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_3,alpha=0.5)
+  ax.set_title('Power of gamma'+str(g_power[n]),size=12)
+
+g_start=-18
+g_end=6
+g_power = np.arange(g_start,g_end, (g_end-g_start)/25)
+
+fig, axs = plt.subplots(nrows=5,ncols=5,figsize=(30,30),sharex=False,sharey=False)
+
+for n, ax in enumerate(axs.flatten()):
+  g_value=10**g_power[n]
+  scikit_kpca=KernelPCA(n_components=2,kernel='rbf',gamma=g_value)
+  X_skernpca = scikit_kpca.fit_transform(X_3)
+  ax.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_3,alpha=0.5)
+  ax.set_title('Power of gamma'+str(g_power[n]),size=12)
+
 """- Polynomial kernel PCA로 진행."""
 
 ## (문제)  데이터 X_3 (Interleaving half circles)를 이용하고 sklearn.decomposition.KernelPCA를 활용하여 KernelPCA를 진행하고 플랏을 그립니다.
@@ -749,6 +886,19 @@ from sklearn.decomposition import KernelPCA
 # 본 과정은 degree의 범위를 좁혀가며 여러번 진행될 수 있습니다.
 # 적정 degree를 찾았다면, gamma, coef0에 대해서도 마찬가지로 진행합니다.
 
+g_start=1
+g_end=19
+g_power = np.arange(g_start,g_end, (g_end-g_start)/9)
+
+fig, axs = plt.subplots(nrows=3,ncols=3,figsize=(20,20),sharex=False,sharey=False)
+
+for n, ax in enumerate(axs.flatten()):
+  g_value=10**g_power[n]
+  scikit_kpca=KernelPCA(n_components=2,kernel='poly',degree=g_power[n])
+  X_skernpca = scikit_kpca.fit_transform(X_3)
+  ax.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_3,alpha=0.5)
+  ax.set_title('degree'+str(g_power[n]),size=12)
+
 """- Sigmoid kernel PCA로 진행."""
 
 ## (문제)  데이터 X_3 (Interleaving half circles)를 이용하고 sklearn.decomposition.KernelPCA를 활용하여 KernelPCA를 진행하고 플랏을 그립니다.
@@ -757,6 +907,44 @@ from sklearn.decomposition import KernelPCA
 # 이를 결정하기 위하여 grid를 25개로 주고, 25개의 다양한 gamma값에 대하여 KenrnelPCA를 진행하고 플랏을 그린 후 적정 gamma 값에 대하여 고민해봅니다.
 # 본 과정은 gamma의 범위를 좁혀가며 여러번 진행될 수 있습니다.
 # 적정 gamma를 찾을 수 있었다면 coef0에 대해서도 마찬가지로 진행합니다.
+g_start=-50
+g_end=50
+g_power=np.arange(g_start,g_end,(g_end-g_start)/25)
+
+fig,axs = plt.subplots(nrows=5,ncols=5,figsize=(30,30),sharex=False,sharey=False)
+
+for n , ax in enumerate(axs.flatten()):
+  g_value=10**g_power[n]
+  scikit_kpca=KernelPCA(n_components=2,kernel='sigmoid',gamma=g_value)
+  X_skernpca=scikit_kpca.fit_transform(X_3)
+  ax.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_3,alpha=0.5)
+  ax.set_title("Power of gamma:" + str(g_power[n]))
+
+g_start=-18
+g_end=2
+g_power=np.arange(g_start,g_end,(g_end-g_start)/25)
+
+fig,axs = plt.subplots(nrows=5,ncols=5,figsize=(30,30),sharex=False,sharey=False)
+
+for n , ax in enumerate(axs.flatten()):
+  g_value=10**g_power[n]
+  scikit_kpca=KernelPCA(n_components=2,kernel='sigmoid',gamma=g_value)
+  X_skernpca=scikit_kpca.fit_transform(X_3)
+  ax.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_3,alpha=0.5)
+  ax.set_title("Power of gamma:" + str(g_power[n]))
+
+g_start=-16.4
+g_end=-14.8
+g_power=np.arange(g_start,g_end,(g_end-g_start)/25)
+
+fig,axs = plt.subplots(nrows=5,ncols=5,figsize=(30,30),sharex=False,sharey=False)
+
+for n , ax in enumerate(axs.flatten()):
+  g_value=10**g_power[n]
+  scikit_kpca=KernelPCA(n_components=2,kernel='sigmoid',gamma=g_value)
+  X_skernpca=scikit_kpca.fit_transform(X_3)
+  ax.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_3,alpha=0.5)
+  ax.set_title("Power of gamma:" + str(g_power[n]))
 
 """### 문제 14. [Kernel PCA] Kernel PCA를 활용하여 비선형 패턴 구분해내기 (Spiral)
 
@@ -770,6 +958,18 @@ from sklearn.decomposition import KernelPCA
 # 비선형 관계 데이터를 선형으로 바꿔주는 적정한 gamma 값을 찾아야 합니다.
 # 이를 결정하기 위하여 grid를 25개로 주고, 25개의 다양한 gamma값에 대하여 KenrnelPCA를 진행하고 플랏을 그린 후 적정 gamma에 대하여 고민해봅니다.
 # 본 과정은 gamma의 범위를 좁혀가며 여러번 진행될 수 있습니다.
+g_start=-22
+g_end=-21
+g_power = np.arange(g_start,g_end, (g_end-g_start)/25)
+
+fig, axs = plt.subplots(nrows=5,ncols=5,figsize=(30,30),sharex=False,sharey=False)
+
+for n, ax in enumerate(axs.flatten()):
+  g_value=10**g_power[n]
+  scikit_kpca=KernelPCA(n_components=2,kernel='rbf',gamma=g_value)
+  X_skernpca = scikit_kpca.fit_transform(X_4)
+  ax.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_4,alpha=0.5)
+  ax.set_title('Power of gamma'+str(g_power[n]),size=12)
 
 """- Polynomial kernel PCA로 진행."""
 
@@ -780,6 +980,19 @@ from sklearn.decomposition import KernelPCA
 # 본 과정은 degree의 범위를 좁혀가며 여러번 진행될 수 있습니다.
 # 적정 degree를 찾았다면, gamma, coef0에 대해서도 마찬가지로 진행합니다.
 
+g_start=1
+g_end=19
+g_power = np.arange(g_start,g_end, (g_end-g_start)/9)
+
+fig, axs = plt.subplots(nrows=3,ncols=3,figsize=(20,20),sharex=False,sharey=False)
+
+for n, ax in enumerate(axs.flatten()):
+  g_value=10**g_power[n]
+  scikit_kpca=KernelPCA(n_components=2,kernel='poly',degree=g_power[n])
+  X_skernpca = scikit_kpca.fit_transform(X_4)
+  ax.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_4,alpha=0.5)
+  ax.set_title('degree'+str(g_power[n]),size=12)
+
 """- Sigmoid kernel PCA로 진행."""
 
 ## (문제)  데이터 X_4 (Spiral)를 이용하고 sklearn.decomposition.KernelPCA를 활용하여 KernelPCA를 진행하고 플랏을 그립니다.
@@ -788,7 +1001,18 @@ from sklearn.decomposition import KernelPCA
 # 이를 결정하기 위하여 grid를 25개로 주고, 25개의 다양한 gamma값에 대하여 KenrnelPCA를 진행하고 플랏을 그린 후 적정 gamma 값에 대하여 고민해봅니다.
 # 본 과정은 gamma의 범위를 좁혀가며 여러번 진행될 수 있습니다.
 
+g_start=-22
+g_end=-2
+g_power=np.arange(g_start,g_end,(g_end-g_start)/25)
 
+fig,axs = plt.subplots(nrows=5,ncols=5,figsize=(30,30),sharex=False,sharey=False)
+
+for n , ax in enumerate(axs.flatten()):
+  g_value=10**g_power[n]
+  scikit_kpca=KernelPCA(n_components=2,kernel='sigmoid',gamma=g_value)
+  X_skernpca=scikit_kpca.fit_transform(X_4)
+  ax.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_4,alpha=0.5)
+  ax.set_title("Power of gamma:" + str(g_power[n]))
 
 """##Step 6. PCA, Kernel PCA의 탐색적 데이터 분석에의 적용
 
@@ -904,6 +1128,27 @@ plt.show()
 from sklearn.decomposition import KernelPCA
 color_code2 = {'Pastry':'Red', 'Z_Scratch':'Blue', 'K_Scatch':'Green', 'Stains':'Black', 'Dirtiness':'Pink', 'Bumps':'Brown', 'Other_Faults':'Gold'}
 
+
+g_start=-50
+g_end=50
+g_power = np.arange(g_start,g_end,(g_end-g_start)/25)
+fig, axs = plt.subplots(nrows=5,ncols=5,figsize=(30,30),sharex=False,sharey=False)
+y_color2=[color_code2.get(i)for i in y_5]
+
+for n , ax in enumerate(axs.flatten()):
+  g_value=10**(g_power[n])
+  scikit_kpca=KernelPCA(n_components=2,kernel='rbf',gamma=g_value)
+  X_skernpca=scikit_kpca.fit_transform(X_5)
+  ax.scatter(X_skernpca[:,0],X_skernpca[:,1],c=y_color2,alpha=0.5)
+  ax.set_title('Power of gamma:' +str(g_power[n]))
+
+plt.suptitle('', y = 0.95)
+plt.subplots_adjust(wspace=0.05)
+plt.show()
+
+#우리가 데이터 설명변수가 굉장히 많은 상황에서 이것들의 전반적인 패턴이 어느 defect와 연관있는지 살펴보고싶다 -> pc1, pc2로 묶어 2차원으로
+#pca는 선형관계 측면에서 정보요약해서 보여줌. kernel pca 데이터관계에 있는 비선형관계를 보여줌
+
 # power of gamma는 -12로 지정하고 KernelPCA를 실시합ㄴ다.
 g_power_val=-12
 g_value=10**(g_power_val)
@@ -923,6 +1168,8 @@ for n, ax in enumerate(axs.flatten()):
 plt.suptitle('', y = 0.95)
 plt.subplots_adjust(wspace=0.05)
 plt.show()
+
+#데이터가 많아 산점도만 봐서는 보기가 힘들다
 
 # Box plot을 통하여 PC1, PC2와 Pastry의 상관관계를 통계적으로 검정함.
 Target_defect="Pastry"
