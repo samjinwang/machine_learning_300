@@ -306,26 +306,43 @@ for _, iid, r_ui, predicted_rating, _ in predictions:
 """
 
 # groupby와 apply 함수를 이용하여 사용자별 시청리스트 추출
+user_watch_dict = rating_df.groupby('user_id')[['user_id','movie_id']].apply(lambda x: x['movie_id'].tolist()) #특정 유저별로 본 영화들을 하나의 리스트로 만듬
 
-
+user_watch_dict
 
 """### 문제 15. 추천 결과 평가 - 특정 시간 기준 사용자별 Train/Test 시청리스트 추출
 추천 결과 평가 - 특정 시간 기준 유저별 시청 목록 추출 (Train/Test과 동일 기준)
 """
 
-# 시간별 시청 분포 탐색
+# 시간별 시청 분포 탐색 
 rating_df['time'].hist(bins=100)
 
 # 8:2 로 분할할 수 있는 시간 지정
-rating_df['time'].quantile(q=0.8, interpolation='nearest')
+that_time = rating_df['time'].quantile(q=0.8, interpolation='nearest')
 
 # 지정된 시간으로 데이터셋 분리
+train_df = rating_df[rating_df['time']< that_time][['user_id','movie_id','rating']]
+test_df = rating_df[rating_df['time'] >= that_time][['user_id','movie_id','rating']]
 
 # 특정 시간 이후를 대상으로 다시 한 번 사용자별 시청리스트 추출
+train_df.shape
+
+len(train_df['user_id'].unique()) #기준 시간전 시청자
+
+len(test_df['user_id'].unique()) #기준 시간 이후 시청자 -> 기준시간전 시청자가 일부 포함됐을수도 있고 새로운 시청자도 있을듯
+
+user_watch_dict_test = test_df.groupby('user_id')[['user_id','movie_id']].apply(lambda x: x['movie_id'].tolist()) #특정 시간 기준으로 만든 테스트 데이터에 대한 유저별 영화 리스트
+#즉 이를 통해 특정시간 이전에 있는 데이터를 학습해 특정시간이후(학습데이터 기준으로는 미래인 테스트 데이터)에 대한 추천 리스트를 볼 수 있다
+
+
 
 """### 문제 16. 추천 결과 평가 - 모델 기반 사용자별 선호 시청리스트 추출"""
 
 # 위에서 추출한 학습 데이터셋으로 SVD 모델 다시 학습
+data = Dataset.load_from_df(df = train_df, reader = reader)
+train_data = data.build_full_trainset()
+algo = SVD(n_factors = 50) #이전에 50이 가장 학습성능이 좋았음
+algo.fit(train_data)
 
 # anti dataset 생성
 test_data = train_data.build_anti_testset()
@@ -333,12 +350,14 @@ test_data = train_data.build_anti_testset()
 # test 함수의 결과를 활용하여 모델을 정성적으로 평가
 predictions = algo.test(testset[:20])
 
-# 모델에 의해 다음을 생성 : 시청하지 않은 영화의 예상 점수
 predictions = algo.test(test_data)
 estimated_unwatched_dict = {}
 
 for uid, iid, _, predicted_rating, _ in predictions:
-  pass  # 시청하지 않은 영화의 예상 점수 추출
+  if uid in estimated_unwatched_dict:
+    estimated_unwatched_dict[uid].append((iid, predicted_rating))
+  else:
+    estimated_unwatched_dict[uid] = [(iid, predicted_rating)]
 
 """### 문제 17. 추천 결과 평가 - 예상 선호 리스트와 실제 시청리스트로 MAP@K 계산
 
@@ -363,23 +382,41 @@ for uid, iid, _, predicted_rating, _ in predictions:
 """
 
 # 4점 이상을 준 test 시청리스트만 추출
+user_watch_dict_list_test = test_df[test_df['rating']>=4].groupby('user_id')[['user_id', 'movie_id']].apply(lambda x: x['movie_id'].tolist())
 
 user_metric = []
 
 # 유저별 k개의 선호 리스트 추출
 k = 3
 for user in estimated_unwatched_dict:
-  pass  # 선호 리스트 추출
+  estimated_list = estimated_unwatched_dict[user].copy()
+  estimated_list.sort(key=lambda tup: tup[1], reverse=True) #tup[1] 점수에 해당하는 부분. reverse -> 내림차순
+  #리스트가 점수에따라 정렬이 됨
+  try: #특정시점 이전에 영화를 본 유저중 특정시점 이후는 영화를 안봤을수도 있다 -> try except로 걸러줌 
+    top_k_prefer_list = [movie[0] for movie in estimated_list[:k]] #높게 평가된 상위 k만 가져옴
+    actual_watch_list = user_watch_dict_list_test[int(user)] #실제 영화평가중 4점 이상인것
+    user_metric.append((user, top_k_prefer_list, actual_watch_list)) # 유저별로 예측ㄱ된 평가와 실제 평가
+  except:
+    print("list index out of range, exclude user " + str(user))
+
+user_metric
 
 # 유저 한 명의 Precision 계산
-predictive_values = ??
-actual_values = ??
+predictive_values = user_metric[0][1]
+actual_values = set(user_metric[0][2])
 tp = [pv for pv in predictive_values if pv in actual_values]
 len(tp) / len(predictive_values)
 
 # user metric를 인자로 받는 일반화된 Precision 계산 함수 정의
 def get_map(user_list):
-  pass
+  precision_list = []
+  for user in user_list:
+    predictive_values = user[1] #예측한 상위 k개
+    actual_values = set(user[2]) #실제로 4점이상 평가한 영화
+    tp = [pv for pv in predictive_values if pv in actual_values] #precision 계산
+    precision = len(tp) / len(predictive_values) #여기서 나온값 ex) 0.33 -> 추천한 3개중 1개는 정말 재밌게 봤다
+    precision_list.append(precision) #각 유저별 precision 값을 저장
+  return sum(precision_list) / len(precision_list) #유저 전반적으로 만족함을 평가한 값 -> 0.1449 -> 100개를 추천했다고 치면 14정도는 만족을 했다
 
 get_map(user_metric)
 
@@ -387,7 +424,34 @@ get_map(user_metric)
 
 # user metric를 인자로 받는 일반화된 Precision 계산 함수 정의
 def get_map_topk(k):
-  pass
+  user_metric = []
+  for user in estimated_unwatched_dict:
+    estimated_list = estimated_unwatched_dict[user].copy()
+    estimated_list.sort(key=lambda tup: tup[1], reverse=True)
+    try:
+      top_k_prefer_list = [movie[0] for movie in estimated_list[:k]]
+      actual_watch_list = user_watch_dict_list_test[user_watch_dict_list_test.index==user].values.tolist()[0]
+      user_metric.append((user, top_k_prefer_list, actual_watch_list))
+    except:
+      pass
+  
+  precision_list = []
+  for user in user_metric:
+    predictive_values = user[1]
+    actual_values = set(user[2])
+    tp = [pv for pv in predictive_values if pv in actual_values]
+    precision = len(tp) / len(predictive_values)
+    precision_list.append(precision)
+  return sum(precision_list) / len(precision_list)
 
 # 반복문, plot 함수를 활용하여 k 파라미터 튜닝 관찰 및 자동화
+k_param_list = range(1,30)
+map_list = []
+for k in k_param_list:    
+  map_list.append(get_map_topk(k))
 
+plt.plot(k_param_list, map_list)
+plt.title('MAP by top k recommendation')
+plt.ylabel('MAP', fontsize=12)
+plt.xlabel('k', fontsize=12)
+plt.show()
