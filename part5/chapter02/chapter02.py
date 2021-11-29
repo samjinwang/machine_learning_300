@@ -561,6 +561,8 @@ train_df.sample(10).head()
 #근데 우리의 목적은 회귀를 하는게 아닌 Factorization Machine 알고리즘을 통해 Raking machine 이라는 알고리즘을 만들것임
 #그래도 Input과 output을 넣고 빼는건 로지스틱 회귀랑 다를게 없다 -> 알고리즘만 다른 것
 
+test_df['y'] = test_df['rating'].apply(lambda x: 1 if x >= 4 else 0)
+
 """### 문제 19. Feature Vector 생성 - libsvm 포맷의 데이터셋 생성
 
 #### Sparse Vector in Linear Model
@@ -637,7 +639,7 @@ train_df
     
     위에 식 : Regression + MF 의 꼴
     [랭킹 모델의 형태와 역할]
-    1. Linear Regression, SVM처럼 동작하는 General predictor
+    1. Linear Regression, SVM등 선형분류 모형처럼 동작하는 General predictor
     2. 변수 간의 모든 pair-wise interaction을 계산하는 알고리즘
     3. General predictor의 장점 + MF 알고리즘이 가지는 의미 단위 해석(latent factor)의 장점
     4. sparse한 데이터셋을 가지고 있을 때 적합
@@ -645,8 +647,9 @@ train_df
 ### 문제 20. 학습 데이터 생성 - 특정 시간 기준 Train/Test 데이터셋 생성
 """
 
-!pip install xlearn #파이썬 기반 C++라이브러리라 쓰기가 쉽지는 않다
+!pip install xlearn #C++기반 파이썬 라이브러리라 쓰기가 쉽지는 않다
 
+#libsvm 포멧으로 된 pointwise 데이터 셋 생성 -> 오래걸림
 txt_file = open('train.txt', 'w')
 for idx, row in train_df.iterrows():
   vec = []
@@ -882,14 +885,18 @@ fm = FactorizationMachine(k=4,#MF에서 Latent Factor의 dimension
                           early_stop_window=3, #3번째 반복부터 큰차이 없으면 학습 중단
                           train_data='./train.txt',
                           valid_data='./test.txt')
-fm.train()
+fm.train() #학습
 
 """## Step 5. 모의 추천 시스템 구축
 
 ### 문제 23. 추천 결과 평가 - 특정 시간 기준 유저별 시청 목록 추출 (Train/Test과 동일 기준)
 """
 
-# train 데이터셋에서 유저 시청 목록 추출
+# train 데이터셋에서 유처 시청 목록 추출
+def get_movie_list_sort_by_time(x):
+  return x.sort_values(['time'])['movie_id'].tolist()
+
+train_user_watch_list = rating_df[rating_df['time'] < 975768738].groupby('user_id')[['movie_id', 'time']].apply(lambda x: get_movie_list_sort_by_time(x))
 
 """### 문제 24. 추천 결과 평가 - Train 데이터 기반 유저별 추천 후보군 생성
 
@@ -897,9 +904,16 @@ fm.train()
 """
 
 # train 데이터셋으로만 m2v 모델 학습
+m2v_train_df = pd.merge(rating_df[rating_df['time'] < 975768738], movie_df, on='movie_id')
+m2v_train_df.head()
+# 각 영화 아이디별 연관 영화 추천 목록 리스트
 
+movie_meta_dict = m2v_train_df.set_index('movie_id')[['decade', 'main_genre']].to_dict()
+# 각 영화 별로 연대,장르를 메타 데이터로 한 딕셔너리 생성
+
+#movie2vec을 학습할수 있도록 하는 데이터 셋 생성
 model = Word2Vec(movie2vec_dataset,
-                 size=100,
+                 size=100, #100차원
                  window=6,  # 주변 word의 윈도우
                  sg=1,  # skip-gram OR cbow
                  hs=0,  # hierarchical softmax OR negative sampling
@@ -907,31 +921,128 @@ model = Word2Vec(movie2vec_dataset,
                  min_count=1,  # word의 등장 최소 횟수
                  iter=20)
 
-# 유저별 최근 시청한 3개 영화 추출
-recent_user_watch_list = rating_df[rating_df['time'] < 975768738].groupby('user_id')[['movie_id', 'time']].apply(lambda x : get_recent_movie_list_sort_by_time(x, 3))
+movie2vec_dataset = []
+for movie_list in train_user_watch_list:
+  meta_list = []
+  for movie_id in movie_list:
+    word_meta_1 = "movie_id:" + str(movie_id)
+    word_meta_2 = "year:" + movie_meta_dict['decade'][movie_id]
+    word_meta_3 = "genre:" + movie_meta_dict['main_genre'][movie_id]
+    meta_list.append(word_meta_1)
+    meta_list.append(word_meta_2)
+    meta_list.append(word_meta_3)
+  movie2vec_dataset.append(meta_list)
+
+
+
+#최근 본 영화를 기준으로 movie2vec을 통해 알아낸 유사 영화중 top k개를 뽑아냄
+def get_recent_movie_list_sort_by_time(x, k):
+  return x.sort_values(['time'])['movie_id'].tolist()[-k:]
+
+recent_user_watch_list = rating_df[rating_df['time'] < 975768738].groupby('user_id')[['movie_id', 'time']].apply(lambda x: get_recent_movie_list_sort_by_time(x, 3))
 
 # 영화별 연관 영화 (item2item) k개씩 추출
 
+item2item = {}
+
+# 영화별 연관 영화 k개씩 추출
+k = 10
+not_in_count = 0
+for movie_id in movie_df['movie_id'].values:
+  item2item[movie_id] = []
+  try:
+    sim_list = model.wv.most_similar("movie_id:" + str(movie_id), topn=k+10)
+    for movie_tup in sim_list:
+      tup_info = movie_tup[0].split(":")
+      if (tup_info[0] == "movie_id") and (len(item2item[movie_id]) < 10):
+        item2item[movie_id].append(tup_info[1])
+  except:
+    not_in_count += 1
+    print("word", str(movie_id) ,"not in vocabulary")
+
+print("total:", not_in_count)
+
+#각 유저마다 최근 시청한 3개의 영화를 기준으로 영화 하나당 5개씩 similar movie들을 추천해준다
+def get_similar_items(x, k):
+  similar_items = []
+  for movie_id in x:
+    if movie_id in item2item:
+      similar_items.append(item2item[movie_id][:k])
+  return [item for items in similar_items for item in items]
+
+recent_watch_similar_items = recent_user_watch_list.apply(lambda x: get_similar_items(x, 5))
+
+recent_watch_similar_items
+
 """#### 2) 평점 기반 인기 영화"""
 
+# EDA에서 추출한 내용. 평점기반 인기영화도 추출해본다
 # 평점 높은 상위 10개의 영화 추출
+mean_ratings = rating_df[rating_df['time'] < 975768738].groupby('movie_id')['rating'].agg(['mean', 'count'])
 
 """#### 3) 장르, 연도별 인기 영화"""
 
 # 장르&연도를 meta로 하여, meta별 상위 10개의 평점 높은 영화 리스트 추출
+popular_movie_list = mean_ratings[mean_ratings['count']>10]['mean'].sort_values(ascending=False).index[:10].tolist()
+
+merge_df = pd.merge(mean_ratings, movie_df, on='movie_id')
+merge_df.head()
+
+# 장르&연도를 meta로 하여, meta별 상위 10개의 평점 높은 영화
+def get_meta_popular_list(x, k):
+  movie_id_list = x.sort_values(by=['mean_x'], ascending=False)['movie_id'].tolist()
+  return movie_id_list[:k]
+
+genre_popular = merge_df.groupby('main_genre').apply(lambda x: get_meta_popular_list(x, k=10))
+year_popular = merge_df.groupby('decade').apply(lambda x: get_meta_popular_list(x, k=10))
 
 """#### 4) 4개 추천 후보군 병합"""
 
 # 위에서 추출한 후보군들을 하나로 병합
+recent_watch_similar_items.apply(lambda x: x.extend(popular_movie_list))
 
 """##### 유저별 선호 장르/연도 파악"""
 
 # 1. 유저별 시청 히스토리를 기준으로 선호하는 장르/연도 지정
 # 2. 선호하는 장르/연도의 인기 리스트 추출
+train_user_watch_list
 
 """##### 최종 병합"""
 
+movie_dict = merge_df[['movie_id', 'decade', 'main_genre']].to_dict()
 
+from collections import Counter 
+
+def most_frequent(x): #기준별로 시청된 횟수를 카운트 한다
+    occurence_count = Counter(x) 
+    return occurence_count.most_common(1)[0][0] 
+
+def get_items_by_prefer_meta(x):
+  year_list = []
+  genre_list = []
+  for movie_id in x: #movie dictionary의 정보들을 가지고 
+    if movie_id in movie_dict['decade']:
+      year_list.append(movie_dict['decade'][movie_id])
+    if movie_id in movie_dict['main_genre']:
+      genre_list.append(movie_dict['main_genre'][movie_id])
+    #가장 많이 시청된 영화의 연대, 장르들을 골라낸다
+  prefer_year = most_frequent(year_list)
+  prefer_genre = most_frequent(genre_list)
+  return year_popular[prefer_year] + genre_popular[prefer_genre]
+
+#여러요소들에대한 시청 횟수에 대한 결과를 담는다
+items_by_prefer_meta = train_user_watch_list.apply(lambda x: get_items_by_prefer_meta(x))
+
+
+
+items_by_prefer_meta.sample(10) #연도,장르,선호도등을 기반으로 각 유저별로 넣는다 -> 비슷한 양상을 띄는게 많을수 있다
+
+#최종 병합
+merged_candidates = recent_watch_similar_items + items_by_prefer_meta
+
+recommendations = merged_candidates.apply(lambda x: set(x)) #중복되는 영화 아이디를 빼줌
+
+recommendations
 
 """### 문제 25. 추천 결과 평가 - 랭킹 모델로 추천 후보군 K개 정렬
 
@@ -939,11 +1050,67 @@ recent_user_watch_list = rating_df[rating_df['time'] < 975768738].groupby('user_
 - ex) [[array([31, 55, 66, 77]), array([1, 1, 1, 1])]]
 """
 
+movie_df['decade'] = movie_df['decade'].apply(lambda x: year_index[x])
+movie_df['main_genre'] = movie_df['main_genre'].apply(lambda x: genre_index[x])
+movie_df = movie_df[['movie_id', 'decade', 'main_genre']]
+movie_df.head()
 
+user_df['gender'] = user_df['gender'].apply(lambda x: gender_index[x])
+user_df['occupation'] = user_df['occupation'].apply(lambda x: occupation_index[x])
+user_df['age_bucket'] = user_df['age_bucket'].apply(lambda x: age_index[x])
+user_df = user_df[['user_id', 'gender', 'age_bucket', 'occupation']]
+user_df.head()
 
+movie_index_dict = movie_df.set_index('movie_id')[['decade', 'main_genre']].to_dict()
+str(movie_index_dict)[:300]
 
+user_index_dict = user_df.set_index('user_id')[['gender', 'age_bucket', 'occupation']].to_dict()
+str(user_index_dict)[:300]
 
+txt_file = open('train.txt', 'w')
+for idx, row in train_df.iterrows():
+  vec = []
+  label = row['y']
+  vec.append(str(label))
+  row = row.drop(labels=['rating'])
+  row = row.drop(labels=['y'])
+  for key, value in row.items():
+    col_idx = col_accum_index_dict[key] + value - 1
+    vec.append(str(col_idx) + ":" + str(1))
+  txt_file.write("%s\n" % " ".join(vec))
+txt_file.close()
 
+col_accum_index_dict
+
+def make_libsvm_row(uid, mid):
+  row = []
+  user_id = str(col_accum_index_dict['user_id'] + uid - 1) + ":" + str(1)
+  gender = str(col_accum_index_dict['gender'] + user_index_dict['gender'][uid] - 1) + ":" + str(1)
+  age_bucket = str(col_accum_index_dict['age_bucket'] + user_index_dict['age_bucket'][uid] - 1) + ":" + str(1)
+  occupation = str(col_accum_index_dict['occupation'] + user_index_dict['occupation'][uid] - 1) + ":" + str(1)
+  movie_id = str(col_accum_index_dict['movie_id'] + int(mid) - 1) + ":" + str(1)
+  released_year_area = str(col_accum_index_dict['decade'] + movie_index_dict['decade'][int(mid)] - 1) + ":" + str(1)
+  main_genre = str(col_accum_index_dict['main_genre'] + movie_index_dict['main_genre'][int(mid)] - 1) + ":" + str(1)
+  return " ".join([user_id, gender, age_bucket, occupation, movie_id, released_year_area, main_genre])
+
+# make vector list
+vector_list = []
+uid_mid_list = []
+for uid, movie_set in recommendations.iteritems():
+  for mid in movie_set:
+    x_feature = []
+    libsvm_row = make_libsvm_row(uid, mid)
+    element = libsvm_row.split(" ")
+    vector_list.append([np.array([int(pair.split(":")[0]) for pair in element]), np.array([int(pair.split(":")[1]) for pair in element])])
+    uid_mid_list.append((uid, mid))
+
+vector_list[0]
+
+uid_mid_list[0]
+
+predict_results = fm.predict(vector_list)
+
+predict_results
 
 """#### 후보군 정렬"""
 
@@ -951,6 +1118,15 @@ recent_user_watch_list = rating_df[rating_df['time'] < 975768738].groupby('user_
 # ex. 
 # {635: {1664: 0.49089334810703084, 3498: 0.7017178066091346, 2444: 0.3960630484760756...}, ...}
 # -> {userid: {movieid: score...}...}
+user_recommendation_dict = {}
+for watch_prob, uid_mid in zip(predict_results, uid_mid_list):
+  uid, mid = int(uid_mid[0]), int(uid_mid[1])
+  if uid not in user_recommendation_dict:
+    user_recommendation_dict[uid] = {}
+    user_recommendation_dict[uid][mid] = watch_prob
+  else:
+    if mid not in user_recommendation_dict[uid]:
+      user_recommendation_dict[uid][mid] = watch_prob
 
 str(user_recommendation_dict)[:2000]
 
@@ -960,6 +1136,74 @@ str(user_recommendation_dict)[:2000]
 """
 
 # 4점 이상을 준 test 시청 리스트 추출하여 MAP 계산
+# 이게 train_df
+user_actual_watch_list = rating_df[(rating_df['time'] < 975768738) & (rating_df['rating'] >= 4)].groupby('user_id')['movie_id'].apply(lambda x: x.tolist())
+
+# 유저 635번의 추천 후보군중 탑 10개
+estimated_list = user_recommendation_dict[635].copy()
+sorted_list = sorted(estimated_list.items(), key=lambda t : t[1], reverse=True)
+top_k_list = [tup[0] for tup in sorted_list][:10]
+
+user_metric = []
+
+# 유저별 k개의 선호 리스트 추출
+k = 3
+for user in user_recommendation_dict:
+  try:
+    estimated_list = user_recommendation_dict[user].copy()
+    sorted_list = sorted(estimated_list.items(), key=lambda t : t[1], reverse=True)
+    top_k_list = [tup[0] for tup in sorted_list][:k]
+    user_metric.append((user, top_k_list, user_actual_watch_list[user]))
+  except:
+    print("list index out of range, exclude user " + str(user))
+
+def get_map(user_list):
+  precision_list = []
+  for user in user_list:
+    predictive_values = user[1]
+    actual_values = set(user[2])
+    tp = [pv for pv in predictive_values if pv in actual_values]
+    precision = len(tp) / len(predictive_values)
+    precision_list.append(precision)
+  return sum(precision_list) / len(precision_list)
+
+get_map(user_metric)
+
+def get_map_topk(k):
+  user_metric = []
+  for user in user_recommendation_dict:
+    try:
+      estimated_list = user_recommendation_dict[user].copy()
+      sorted_list = sorted(estimated_list.items(), key=lambda t : t[1], reverse=True)
+      top_k_list = [tup[0] for tup in sorted_list][:k]
+      user_metric.append((user, top_k_list, user_actual_watch_list[user]))
+    except:
+      print("list index out of range, exclude user " + str(user))
+  
+  precision_list = []
+  for user in user_metric:
+    predictive_values = user[1]
+    actual_values = set(user[2])
+    tp = [pv for pv in predictive_values if pv in actual_values]
+    precision = len(tp) / len(predictive_values)
+    precision_list.append(precision)
+  return sum(precision_list) / len(precision_list)
+
+k_param_list = range(1,30)
+map_list = []
+for k in k_param_list:    
+  map_list.append(get_map_topk(k))
+
+
 
 # 아래 그래프처럼 map@k 시각화
+
+import matplotlib.pyplot as plt
+plt.plot(k_param_list, map_list)
+plt.title('MAP by top k recommendation')
+plt.ylabel('MAP', fontsize=12)
+plt.xlabel('k', fontsize=12)
+plt.show()
+#상위 15개정도까지 추천해주는게 좋은것 같다
+#15개정도 추천햇을때 10개중 하나는 맞춘다
 
